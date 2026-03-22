@@ -1,79 +1,118 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TextInput, Button, ScrollView, SafeAreaView, TouchableOpacity } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { View, Text, StyleSheet, TextInput, Button, ScrollView, SafeAreaView, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { differenceInDays, addMonths, isAfter } from 'date-fns';
-
-const STORAGE_KEY = 'burpee_workout_userData';
-
-interface UserData {
-  startDate: string;
-  startWeight: string;
-  endDate?: string;
-  endWeight?: string;
-}
-
-const LEVELS = [
-  { id: '1A', name: 'Level 1A', desc: 'No Landmark Workout' },
-  { id: '1B', name: 'Level 1B', desc: '20 Seals, 50 6-counts in 20m' },
-  { id: '1C', name: 'Level 1C', desc: '40 Seals, 100 6-counts in 20m' },
-  { id: '1D', name: 'Level 1D', desc: '60 Seals, 150 6-counts in 20m' },
-  { id: '2', name: 'Level 2', desc: '80 Seals, 200 6-counts in 20m' },
-  { id: '3', name: 'Level 3', desc: '100 Seals, 250 6-counts in 20m' },
-  { id: '4', name: 'Level 4', desc: '120 Seals, 275 6-counts in 20m' },
-];
+import { onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, User } from 'firebase/auth';
+import { auth } from '../../lib/firebase';
+import { getUserData, saveUserDataDB } from '../../lib/db';
+import { UserData, LEVELS } from '../../types';
 
 export default function HomeScreen() {
+  const [user, setUser] = useState<User | null>(null);
   const [userData, setUserData] = useState<UserData | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Forms
+  // Auth Forms
+  const [isLoginFlow, setIsLoginFlow] = useState(true);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [authError, setAuthError] = useState('');
+
+  // Onboarding Forms
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [weight, setWeight] = useState('');
   
   const [showCheckin, setShowCheckin] = useState(false);
 
   useEffect(() => {
-    loadData();
+    const unsubscribe = onAuthStateChanged(auth, async (u) => {
+      setUser(u);
+      if (u) {
+        try {
+          const ud = await getUserData(u.uid);
+          setUserData(ud || null);
+        } catch (e) {
+          console.error('Error fetching data:', e);
+        }
+      } else {
+        setUserData(null);
+      }
+      setLoading(false);
+    });
+    return () => unsubscribe();
   }, []);
 
-  const loadData = async () => {
+  const handleAuth = async () => {
+    setAuthError('');
     try {
-      const data = await AsyncStorage.getItem(STORAGE_KEY);
-      if (data) {
-        const parsed = JSON.parse(data);
-        setUserData(parsed);
-        const start = new Date(parsed.startDate);
-        const milestone = addMonths(start, 6);
-        if (isAfter(new Date(), milestone) && !parsed.endDate) {
-          setShowCheckin(true);
-        }
+      if (isLoginFlow) {
+        await signInWithEmailAndPassword(auth, email, password);
+      } else {
+        await createUserWithEmailAndPassword(auth, email, password);
       }
-    } catch (e) {}
-    setLoading(false);
+    } catch (err: any) {
+      setAuthError(err.message);
+    }
   };
 
   const startProgram = async () => {
-    if (!weight) return;
-    const newData = { startDate: date, startWeight: weight };
-    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(newData));
+    if (!weight || !user) return;
+    const newData: UserData = { 
+      startDate: date, 
+      startWeight: parseFloat(weight),
+      startPictureUrl: null,
+      currentLevelId: '1B'
+    };
+    await saveUserDataDB(user.uid, newData);
     setUserData(newData);
   };
 
-  const completeCheckin = async () => {
-    if (!weight || !userData) return;
-    const newData = { ...userData, endDate: date, endWeight: weight };
-    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(newData));
-    setUserData(newData);
-    setShowCheckin(false);
+  const handleLogout = async () => {
+    await signOut(auth);
   };
 
-  const clearData = async () => {
-    await AsyncStorage.removeItem(STORAGE_KEY);
-    setUserData(null);
-  };
+  if (loading) {
+    return (
+      <View style={styles.center}>
+        <ActivityIndicator size="large" color="#FF3366" />
+      </View>
+    );
+  }
 
-  if (loading) return <View style={styles.center}><Text>Loading...</Text></View>;
+  // --- 1. NOT AUTHENTICATED: Show Login Screen ---
+  if (!user) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.card}>
+          <Text style={styles.title}>{isLoginFlow ? 'Welcome Back' : 'Create Account'}</Text>
+          <Text style={styles.subtitle}>Sync with the web app</Text>
+          {authError ? <Text style={{ color: 'red', marginBottom: 10 }}>{authError}</Text> : null}
+          <TextInput 
+            style={styles.input} 
+            value={email} 
+            onChangeText={setEmail} 
+            placeholder="Email" 
+            autoCapitalize="none"
+            keyboardType="email-address"
+          />
+          <TextInput 
+            style={styles.input} 
+            value={password} 
+            onChangeText={setPassword} 
+            placeholder="Password" 
+            secureTextEntry 
+          />
+          <Button title={isLoginFlow ? 'Sign In' : 'Sign Up'} onPress={handleAuth} color="#FF3366" />
+          <TouchableOpacity onPress={() => setIsLoginFlow(!isLoginFlow)} style={{marginTop: 15}}>
+             <Text style={{textAlign: 'center', color: '#00E5FF'}}>
+               {isLoginFlow ? "Don't have an account? Sign up" : 'Already have an account? Sign in'}
+             </Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
+  // --- 2. AUTHENTICATED BUT NO DATA: Show Onboarding ---
   if (!userData) {
     return (
       <SafeAreaView style={styles.container}>
@@ -83,29 +122,17 @@ export default function HomeScreen() {
           <TextInput style={styles.input} value={date} onChangeText={setDate} placeholder="YYYY-MM-DD" />
           <TextInput style={styles.input} value={weight} onChangeText={setWeight} placeholder="Weight in lbs/kg" keyboardType="numeric" />
           <Button title="Start Journey" onPress={startProgram} color="#FF3366" />
+          <View style={{marginTop: 20}}>
+            <Button title="Logout" onPress={handleLogout} color="#888" />
+          </View>
         </View>
       </SafeAreaView>
     );
   }
 
-  if (showCheckin) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.card}>
-          <Text style={styles.title}>🎉 6 Month Milestone!</Text>
-          <Text style={styles.subtitle}>Update your stats to check-in.</Text>
-          <TextInput style={styles.input} value={date} onChangeText={setDate} placeholder="YYYY-MM-DD" />
-          <TextInput style={styles.input} value={weight} onChangeText={setWeight} placeholder="New Weight" keyboardType="numeric" />
-          <Button title="Log Progress" onPress={completeCheckin} color="#00E5FF" />
-          <TouchableOpacity onPress={() => setShowCheckin(false)} style={{marginTop: 10}}>
-             <Text style={{textAlign: 'center', color: '#666'}}>Remind Me Later</Text>
-          </TouchableOpacity>
-        </View>
-      </SafeAreaView>
-    );
-  }
-
+  // --- 3. AUTHENTICATED WITH DATA: Show Dashboard ---
   const daysPassed = Math.max(0, differenceInDays(new Date(), new Date(userData.startDate)));
+  const currentLevelObj = userData.currentLevelId ? LEVELS.find(l => l.id === userData.currentLevelId) : null;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -114,6 +141,11 @@ export default function HomeScreen() {
         <Text style={styles.desc}>Day {daysPassed} • Schedule: Mon, Tue, Thu, Fri</Text>
 
         <View style={styles.statsCard}>
+           {currentLevelObj && (
+             <Text style={[styles.statLine, { color: '#00E5FF', fontWeight: 'bold', marginBottom: 10 }]}>
+               Current: {currentLevelObj.name}
+             </Text>
+           )}
            <Text style={styles.statLine}>Start Date: {userData.startDate}</Text>
            <Text style={styles.statLine}>Starting Weight: {userData.startWeight}</Text>
            {userData.endDate && (
@@ -125,15 +157,18 @@ export default function HomeScreen() {
         </View>
 
         <Text style={[styles.header, { fontSize: 22, marginTop: 20 }]}>Levels</Text>
-        {LEVELS.map(lvl => (
-          <View key={lvl.id} style={styles.levelCard}>
-            <Text style={styles.levelTitle}>{lvl.name}</Text>
-            <Text style={styles.levelDesc}>{lvl.desc}</Text>
-          </View>
-        ))}
+        {LEVELS.map((lvl) => {
+          const isCurrent = userData.currentLevelId === lvl.id;
+          return (
+            <View key={lvl.id} style={[styles.levelCard, isCurrent && { borderColor: '#FF3366', borderWidth: 2 }]}>
+              <Text style={styles.levelTitle}>{lvl.name} {isCurrent && '(Active)'}</Text>
+              <Text style={styles.levelDesc}>{lvl.description}</Text>
+            </View>
+          );
+        })}
 
         <View style={{ marginTop: 40, marginBottom: 40 }}>
-           <Button title="Reset Data" onPress={clearData} color="#444" />
+           <Button title="Log Out" onPress={handleLogout} color="#444" />
         </View>
       </ScrollView>
     </SafeAreaView>
