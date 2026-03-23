@@ -10,7 +10,8 @@ export function useUserData() {
 
   useEffect(() => {
     let mounted = true;
-    
+    setIsLoaded(false); // Reset while fetching so we show loading instead of Onboarding
+
     async function loadFirebaseData() {
       if (!user) {
         setUserData(null);
