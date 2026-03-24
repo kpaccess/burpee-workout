@@ -107,8 +107,8 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
             {user ? (
               <>
                 Signed in as <strong>{accountLabel}</strong>. Your profile loads
-                from this account. If you already set up on another device,
-                sign in with the same account here.
+                from this account. If you already set up on another device, sign
+                in with the same account here.
               </>
             ) : (
               <>
