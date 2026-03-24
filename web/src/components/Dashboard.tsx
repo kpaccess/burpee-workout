@@ -9,6 +9,7 @@ import VideocamIcon from '@mui/icons-material/Videocam';
 import LocalFireDepartmentIcon from '@mui/icons-material/LocalFireDepartment';
 import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import { useAuth } from '../context/AuthContext';
+import { toDateKey } from '../lib/date';
 
 interface DashboardProps {
   userData: UserData;
@@ -49,6 +50,17 @@ export default function Dashboard({ userData, onClear, onMilestoneCheckin, onTog
       onUpdateData({ currentLevelId: newLevel });
     }
     setOpenLevelChange(false);
+  };
+
+  const getWorkoutStatusForDate = (dateStr: string) => {
+    const logs = userData.workoutLogs || [];
+    const normalizedDate = toDateKey(dateStr);
+    for (let i = logs.length - 1; i >= 0; i -= 1) {
+      if (toDateKey(logs[i].date) === normalizedDate) {
+        return !!logs[i].completed;
+      }
+    }
+    return false;
   };
 
   return (
@@ -157,8 +169,7 @@ export default function Dashboard({ userData, onClear, onMilestoneCheckin, onTog
              {trackingDays.map(dateStr => {
                const dayObj = new Date(dateStr + "T00:00:00");
                const _dayName = format(dayObj, 'EEE');
-               const dayLog = userData.workoutLogs?.find(l => l.date === dateStr);
-               const isCompleted = dayLog?.completed || false;
+               const isCompleted = getWorkoutStatusForDate(dateStr);
                
                const isWorkoutDay = ['Mon', 'Tue', 'Thu', 'Fri'].includes(_dayName);
                

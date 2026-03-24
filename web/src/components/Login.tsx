@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { Box, Card, Typography, TextField, Button, Alert } from '@mui/material';
 import { motion } from 'framer-motion';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
-import { auth } from '../lib/firebase';
+import { auth, missingFirebaseEnvVars } from '../lib/firebase';
 
 export default function Login() {
   const [isLogin, setIsLogin] = useState(true);
@@ -14,8 +14,13 @@ export default function Login() {
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!auth) return;
     setError('');
+    if (!auth) {
+      setError(
+        `Firebase is not configured in this deployment. Missing env vars: ${missingFirebaseEnvVars.join(', ')}`
+      );
+      return;
+    }
     try {
       if (isLogin) {
         await signInWithEmailAndPassword(auth, email, password);

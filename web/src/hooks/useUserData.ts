@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { UserData } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { getUserData, saveUserDataDB } from '../lib/db';
+import { toDateKey } from '../lib/date';
 
 export function useUserData() {
   const { user } = useAuth();
@@ -45,13 +46,15 @@ export function useUserData() {
 
   const toggleWorkoutLog = async (dateStr: string, completed: boolean) => {
     if (!user || !userData) return;
+    const normalizedDate = toDateKey(dateStr);
     const logs = [...(userData.workoutLogs || [])];
-    const idx = logs.findIndex(l => l.date === dateStr);
+    const idx = logs.findIndex(l => toDateKey(l.date) === normalizedDate);
     
     if (idx >= 0) {
       logs[idx].completed = completed;
+      logs[idx].date = normalizedDate;
     } else {
-      logs.push({ date: dateStr, completed });
+      logs.push({ date: normalizedDate, completed });
     }
     
     await saveUserData({ workoutLogs: logs });
