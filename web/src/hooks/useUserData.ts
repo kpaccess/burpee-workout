@@ -6,29 +6,35 @@ import { toDateKey } from '../lib/date';
 
 export function useUserData() {
   const { user } = useAuth();
-  const [userData, setUserData] = useState<UserData | null>(null);
-  const [isLoaded, setIsLoaded] = useState(false);
+  const [userData, setUserData] = useState<UserData | null | undefined>(undefined);
+  const [syncError, setSyncError] = useState<string | null>(null);
 
   useEffect(() => {
     let mounted = true;
-    setIsLoaded(false); // Reset while fetching so we show loading instead of Onboarding
 
     async function loadFirebaseData() {
       if (!user) {
         setUserData(null);
-        setIsLoaded(true);
+        setSyncError(null);
         return;
       }
+
+      // Mark as loading for authenticated users while Firestore fetch runs.
+      setUserData(undefined);
       
       try {
         const data = await getUserData(user.uid);
         if (mounted) {
           setUserData(data || null);
-          setIsLoaded(true);
+          setSyncError(null);
         }
       } catch (err) {
         console.error('Failed to load user data from Firebase', err);
-        if (mounted) setIsLoaded(true);
+        if (mounted) {
+          // Keep undefined so UI doesn't look like a first-time user.
+          setUserData(undefined);
+          setSyncError('Failed to load your data from Firebase.');
+        }
       }
     }
 
@@ -39,9 +45,17 @@ export function useUserData() {
 
   const saveUserData = async (data: Partial<UserData>) => {
     if (!user) return;
-    const newData = { ...userData, ...data } as UserData;
+    const baseData = (userData ?? {}) as Partial<UserData>;
+    const newData = { ...baseData, ...data } as UserData;
     setUserData(newData); // Optimistic UI update
-    await saveUserDataDB(user.uid, newData);
+    try {
+      await saveUserDataDB(user.uid, newData);
+      setSyncError(null);
+    } catch (err) {
+      console.error('Failed to save user data to Firebase', err);
+      setSyncError('Failed to sync data. Please check your login and try again.');
+      throw err;
+    }
   };
 
   const toggleWorkoutLog = async (dateStr: string, completed: boolean) => {
@@ -65,5 +79,7 @@ export function useUserData() {
     // Real implementation would delete from DB here or let the AuthContext handle logout
   };
 
-  return { userData, isLoaded, saveUserData, clearUserData, toggleWorkoutLog };
+  const isLoaded = !user || userData !== undefined || !!syncError;
+
+  return { userData, isLoaded, saveUserData, clearUserData, toggleWorkoutLog, syncError };
 }
