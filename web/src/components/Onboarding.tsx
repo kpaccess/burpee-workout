@@ -1,20 +1,25 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Box, Button, Card, Typography, TextField, Stack, MenuItem, Select, InputLabel, FormControl } from '@mui/material';
+import { Box, Button, Card, Typography, TextField, Stack, MenuItem, Select, InputLabel, FormControl, Alert } from '@mui/material';
 import PhotoCamera from '@mui/icons-material/PhotoCamera';
 import { motion } from 'framer-motion';
+import Image from 'next/image';
 import { LEVELS } from '../types';
+import { useAuth } from '../context/AuthContext';
 
 interface OnboardingProps {
   onComplete: (data: { startDate: string; startWeight: number; startPictureUrl: string | null; currentLevelId: string }) => void;
 }
 
 export default function Onboarding({ onComplete }: OnboardingProps) {
+  const { user, logout } = useAuth();
   const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
   const [weight, setWeight] = useState('');
   const [pictureUrl, setPictureUrl] = useState<string | null>(null);
   const [level, setLevel] = useState('1B');
+
+  const accountLabel = user?.email || (user ? `UID: ${user.uid}` : 'Unknown account');
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -57,8 +62,19 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
           The Busy Dad Program
         </Typography>
         <Typography variant="body1" gutterBottom align="center" color="text.secondary" sx={{ mb: 4 }}>
-          It's time to begin your journey. Start with your day 1 stats.
+          It&apos;s time to begin your journey. Start with your day 1 stats.
         </Typography>
+
+        {user && (
+          <Alert severity="info" sx={{ mb: 3 }}>
+            <Typography variant="body2" component="span" display="block" gutterBottom>
+              Signed in as <strong>{accountLabel}</strong>. Your profile loads from this account. If you already set up on another device, sign in with the same account here.
+            </Typography>
+            <Button size="small" variant="outlined" color="inherit" onClick={() => logout()}>
+              Sign out and use a different account
+            </Button>
+          </Alert>
+        )}
 
         <form onSubmit={handleSubmit}>
           <Stack spacing={3}>
@@ -106,7 +122,14 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
               <label htmlFor="icon-button-file">
                 <Box sx={{ mb: 2 }}>
                   {pictureUrl ? (
-                    <img src={pictureUrl} alt="Preview" style={{ maxWidth: '100%', maxHeight: 200, borderRadius: 8 }} />
+                    <Image
+                      src={pictureUrl}
+                      alt="Preview"
+                      width={320}
+                      height={200}
+                      unoptimized
+                      style={{ maxWidth: '100%', height: 'auto', maxHeight: 200, borderRadius: 8 }}
+                    />
                   ) : (
                     <Typography color="text.secondary">Upload a picture of yourself</Typography>
                   )}
