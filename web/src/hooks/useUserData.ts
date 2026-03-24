@@ -63,12 +63,14 @@ export function useUserData() {
     const normalizedDate = toDateKey(dateStr);
     const logs = [...(userData.workoutLogs || [])];
     const idx = logs.findIndex(l => toDateKey(l.date) === normalizedDate);
+    const levelCompleted = completed ? (userData.currentLevelId || undefined) : undefined;
     
     if (idx >= 0) {
       logs[idx].completed = completed;
       logs[idx].date = normalizedDate;
+      logs[idx].levelCompleted = levelCompleted;
     } else {
-      logs.push({ date: normalizedDate, completed });
+      logs.push({ date: normalizedDate, completed, levelCompleted });
     }
     
     await saveUserData({ workoutLogs: logs });

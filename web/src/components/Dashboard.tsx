@@ -19,7 +19,8 @@ import {
   FormControl,
   Alert,
 } from "@mui/material";
-import { UserData, LEVELS } from "../types";
+import PhotoCamera from "@mui/icons-material/PhotoCamera";
+import { UserData, LEVELS, WorkoutLog } from "../types";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   addMonths,
@@ -85,16 +86,33 @@ export default function Dashboard({
     setOpenLevelChange(false);
   };
 
-  const getWorkoutStatusForDate = (dateStr: string) => {
+  const handleDay1PictureChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !onUpdateData) return;
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      onUpdateData({ startPictureUrl: reader.result as string });
+    };
+    reader.readAsDataURL(file);
+    // Reset input so selecting the same file again still triggers onChange.
+    e.target.value = "";
+  };
+
+  const getWorkoutLogForDate = (dateStr: string): WorkoutLog | null => {
     const logs = userData.workoutLogs || [];
     const normalizedDate = toDateKey(dateStr);
     for (let i = logs.length - 1; i >= 0; i -= 1) {
       if (toDateKey(logs[i].date) === normalizedDate) {
-        return !!logs[i].completed;
+        return logs[i];
       }
     }
-    return false;
+    return null;
   };
+
+  const day1PictureUrl =
+    userData.startPictureUrl ||
+    (userData as UserData & { startPictureURl?: string }).startPictureURl ||
+    null;
 
   return (
     <Box sx={{ p: { xs: 2, md: 4 }, maxWidth: 1200, mx: "auto" }}>
@@ -308,7 +326,8 @@ export default function Dashboard({
             {trackingDays.map((dateStr) => {
               const dayObj = new Date(dateStr + "T00:00:00");
               const _dayName = format(dayObj, "EEE");
-              const isCompleted = getWorkoutStatusForDate(dateStr);
+              const dayLog = getWorkoutLogForDate(dateStr);
+              const isCompleted = !!dayLog?.completed;
 
               const isWorkoutDay = ["Mon", "Tue", "Thu", "Fri"].includes(
                 _dayName,
@@ -342,11 +361,18 @@ export default function Dashboard({
                     {format(dayObj, "d")}
                   </Typography>
                   {isWorkoutDay ? (
-                    <Checkbox
-                      checked={isCompleted}
-                      onChange={() => handleToggle(dateStr, isCompleted)}
-                      color="secondary"
-                    />
+                    <>
+                      <Checkbox
+                        checked={isCompleted}
+                        onChange={() => handleToggle(dateStr, isCompleted)}
+                        color="secondary"
+                      />
+                      {isCompleted && dayLog?.levelCompleted && (
+                        <Typography variant="caption" sx={{ color: "#00E5FF", lineHeight: 1 }}>
+                          {dayLog.levelCompleted}
+                        </Typography>
+                      )}
+                    </>
                   ) : (
                     <Typography variant="caption" sx={{ mt: 1, color: "#666" }}>
                       Rest
@@ -357,6 +383,77 @@ export default function Dashboard({
             })}
           </Box>
         </Card>
+
+        {/* Progress Photos */}
+        <Typography variant="h5" fontWeight={700} gutterBottom mt={4} mb={2}>
+          Progress Photos
+        </Typography>
+        <Grid container spacing={2} mb={4}>
+          <Grid sx={{ xs: 12, md: 6 }}>
+            <Card sx={{ p: 2, height: "100%" }}>
+              <Typography variant="subtitle1" fontWeight={700} color="primary" gutterBottom>
+                Day 1
+              </Typography>
+              {day1PictureUrl ? (
+                <Box
+                  component="img"
+                  src={day1PictureUrl}
+                  alt="Day 1 progress"
+                  sx={{
+                    width: "100%",
+                    maxHeight: 320,
+                    objectFit: "cover",
+                    borderRadius: 2,
+                    border: "1px solid #333",
+                  }}
+                />
+              ) : (
+                <Typography variant="body2" color="text.secondary">
+                  No Day 1 picture uploaded yet.
+                </Typography>
+              )}
+              <Box sx={{ mt: 2 }}>
+                <input
+                  accept="image/*"
+                  style={{ display: "none" }}
+                  id="update-day1-picture"
+                  type="file"
+                  onChange={handleDay1PictureChange}
+                />
+                <label htmlFor="update-day1-picture">
+                  <Button variant="outlined" component="span" startIcon={<PhotoCamera />}>
+                    {day1PictureUrl ? "Replace Day 1 Picture" : "Upload Day 1 Picture"}
+                  </Button>
+                </label>
+              </Box>
+            </Card>
+          </Grid>
+          <Grid sx={{ xs: 12, md: 6 }}>
+            <Card sx={{ p: 2, height: "100%" }}>
+              <Typography variant="subtitle1" fontWeight={700} color="secondary" gutterBottom>
+                6-Month Check-in
+              </Typography>
+              {userData.endPictureUrl ? (
+                <Box
+                  component="img"
+                  src={userData.endPictureUrl}
+                  alt="6-month progress"
+                  sx={{
+                    width: "100%",
+                    maxHeight: 320,
+                    objectFit: "cover",
+                    borderRadius: 2,
+                    border: "1px solid #333",
+                  }}
+                />
+              ) : (
+                <Typography variant="body2" color="text.secondary">
+                  Your latest check-in picture will appear here after milestone check-in.
+                </Typography>
+              )}
+            </Card>
+          </Grid>
+        </Grid>
 
         {/* Levels List */}
         <Typography variant="h5" fontWeight={700} gutterBottom mt={4} mb={2}>
