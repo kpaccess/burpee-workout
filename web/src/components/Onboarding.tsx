@@ -97,28 +97,38 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
           It&apos;s time to begin your journey. Start with your day 1 stats.
         </Typography>
 
-        {user && (
-          <Alert severity="info" sx={{ mb: 3 }}>
-            <Typography
-              variant="body2"
-              component="span"
-              display="block"
-              gutterBottom
-            >
-              Signed in as <strong>{accountLabel}</strong>. Your profile loads
-              from this account. If you already set up on another device, sign
-              in with the same account here.
-            </Typography>
-            <Button
-              size="small"
-              variant="outlined"
-              color="inherit"
-              onClick={() => logout()}
-            >
-              Sign out and use a different account
-            </Button>
-          </Alert>
-        )}
+        <Alert severity={user ? "info" : "warning"} sx={{ mb: 3 }}>
+          <Typography
+            variant="body2"
+            component="span"
+            display="block"
+            gutterBottom
+          >
+            {user ? (
+              <>
+                Signed in as <strong>{accountLabel}</strong>. Your profile loads
+                from this account. If you already set up on another device,
+                sign in with the same account here.
+              </>
+            ) : (
+              <>
+                Session looks out of sync. Use the button below to reset auth
+                and sign in again.
+              </>
+            )}
+          </Typography>
+          <Button
+            size="small"
+            variant="outlined"
+            color="inherit"
+            onClick={async () => {
+              await logout();
+              window.location.reload();
+            }}
+          >
+            Sign out and use a different account
+          </Button>
+        </Alert>
 
         <form onSubmit={handleSubmit}>
           <Stack spacing={3}>
