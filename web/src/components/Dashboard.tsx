@@ -28,6 +28,12 @@ import {
   isAfter,
   format,
   subDays,
+  startOfMonth,
+  endOfMonth,
+  eachDayOfInterval,
+  startOfWeek,
+  endOfWeek,
+  isSameMonth
 } from "date-fns";
 import VideocamIcon from "@mui/icons-material/Videocam";
 import LocalFireDepartmentIcon from "@mui/icons-material/LocalFireDepartment";
@@ -65,13 +71,12 @@ export default function Dashboard({
   const daysPassed = differenceInDays(today, startDate);
   const daysToMilestone = differenceInDays(milestoneDate, today);
 
-  // Generate last 7 days for the Tracker
-  const trackingDays = Array.from({ length: 7 })
-    .map((_, i) => {
-      const d = subDays(today, i);
-      return format(d, "yyyy-MM-dd");
-    })
-    .reverse();
+  // Generate calendar days for the selected month
+  const [currentMonth, setCurrentMonth] = useState(() => startOfMonth(new Date()));
+  const startDateGrid = startOfWeek(currentMonth);
+  const endDateGrid = endOfWeek(endOfMonth(currentMonth));
+  
+  const trackingDays = eachDayOfInterval({ start: startDateGrid, end: endDateGrid }).map((d) => format(d, "yyyy-MM-dd"));
 
   const handleToggle = (dateStr: string, currentStatus: boolean) => {
     if (onToggleWorkout) {
@@ -309,11 +314,20 @@ export default function Dashboard({
           </Grid>
         </Grid>
 
-        {/* Daily Tracker Row */}
+        {/* Monthly Tracker Row */}
         <Card sx={{ p: 3, mb: 4 }}>
-          <Typography variant="h6" color="primary" gutterBottom>
-            Daily Tracker
-          </Typography>
+          <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+            <Typography variant="h6" color="primary">
+              Workout Calendar
+            </Typography>
+            <Box display="flex" alignItems="center" gap={1}>
+              <Button size="small" onClick={() => setCurrentMonth(addMonths(currentMonth, -1))}>Prev</Button>
+              <Typography variant="subtitle1" fontWeight="bold" sx={{ minWidth: 120, textAlign: 'center' }}>
+                {format(currentMonth, "MMMM yyyy")}
+              </Typography>
+              <Button size="small" onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}>Next</Button>
+            </Box>
+          </Box>
           {syncError && (
             <Alert severity="error" sx={{ mb: 2 }}>
               {syncError}
@@ -322,16 +336,23 @@ export default function Dashboard({
           <Typography variant="body2" color="text.secondary" mb={2}>
             Check off your workout on scheduled days (Mon, Tue, Thu, Fri)
           </Typography>
-          <Box sx={{ display: "flex", overflowX: "auto", gap: 2, pb: 1 }}>
+          
+          <Box display="grid" gridTemplateColumns="repeat(7, 1fr)" gap={1} mb={1}>
+            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+              <Typography key={day} variant="caption" color="text.secondary" align="center" fontWeight="bold">
+                {day}
+              </Typography>
+            ))}
+          </Box>
+          
+          <Box display="grid" gridTemplateColumns="repeat(7, 1fr)" gap={1}>
             {trackingDays.map((dateStr) => {
               const dayObj = new Date(dateStr + "T00:00:00");
               const _dayName = format(dayObj, "EEE");
               const dayLog = getWorkoutLogForDate(dateStr);
               const isCompleted = !!dayLog?.completed;
-
-              const isWorkoutDay = ["Mon", "Tue", "Thu", "Fri"].includes(
-                _dayName,
-              );
+              const isWorkoutDay = ["Mon", "Tue", "Thu", "Fri"].includes(_dayName);
+              const isCurrentMonth = isSameMonth(dayObj, currentMonth);
 
               return (
                 <Box
@@ -340,8 +361,8 @@ export default function Dashboard({
                     display: "flex",
                     flexDirection: "column",
                     alignItems: "center",
-                    minWidth: 60,
-                    p: 1,
+                    minHeight: 80,
+                    p: 0.5,
                     borderRadius: 2,
                     border: isCompleted
                       ? "1px solid #00E5FF"
@@ -351,30 +372,29 @@ export default function Dashboard({
                     background: isCompleted
                       ? "rgba(0, 229, 255, 0.1)"
                       : "transparent",
-                    opacity: isWorkoutDay ? 1 : 0.5,
+                    opacity: isCurrentMonth ? (isWorkoutDay ? 1 : 0.6) : 0.2,
                   }}
                 >
-                  <Typography variant="caption" color="text.secondary">
-                    {_dayName}
-                  </Typography>
-                  <Typography variant="body2" fontWeight="bold">
+                  <Typography variant="body2" fontWeight={isCurrentMonth ? "bold" : "normal"}>
                     {format(dayObj, "d")}
                   </Typography>
                   {isWorkoutDay ? (
-                    <>
+                    <Box display="flex" flexDirection="column" alignItems="center" mt={0.5}>
                       <Checkbox
                         checked={isCompleted}
                         onChange={() => handleToggle(dateStr, isCompleted)}
                         color="secondary"
+                        size="small"
+                        sx={{ p: 0.5 }}
                       />
                       {isCompleted && dayLog?.levelCompleted && (
-                        <Typography variant="caption" sx={{ color: "#00E5FF", lineHeight: 1 }}>
+                        <Typography variant="caption" sx={{ color: "#00E5FF", lineHeight: 1, fontSize: '0.65rem' }} align="center">
                           {dayLog.levelCompleted}
                         </Typography>
                       )}
-                    </>
+                    </Box>
                   ) : (
-                    <Typography variant="caption" sx={{ mt: 1, color: "#666" }}>
+                    <Typography variant="caption" sx={{ mt: 1, color: "#666", fontSize: '0.65rem' }}>
                       Rest
                     </Typography>
                   )}
