@@ -58,22 +58,38 @@ export function useUserData() {
     }
   };
 
-  const toggleWorkoutLog = async (dateStr: string, completed: boolean) => {
+  const toggleWorkoutLog = async (dateStr: string, completed: boolean, type?: 'N' | 'C') => {
     if (!user || !userData) return;
     const normalizedDate = toDateKey(dateStr);
-    const logs = [...(userData.workoutLogs || [])];
+    
+    // Create a deeper copy of logs to avoid read-only mutation issues
+    const logs = [...(userData.workoutLogs || [])].map(log => ({...log}));
     const idx = logs.findIndex(l => toDateKey(l.date) === normalizedDate);
-    const levelCompleted = completed ? (userData.currentLevelId || undefined) : undefined;
+    const typeSuffix = type ? `(${type})` : '';
+    const levelCompleted = completed ? `${userData.currentLevelId || ''}${typeSuffix}` : null;
     
     if (idx >= 0) {
       logs[idx].completed = completed;
       logs[idx].date = normalizedDate;
-      logs[idx].levelCompleted = levelCompleted;
+      if (levelCompleted) {
+        logs[idx].levelCompleted = levelCompleted;
+      } else {
+        delete logs[idx].levelCompleted; // Remove field to prevent undefined/null Firestore complaints
+      }
     } else {
-      logs.push({ date: normalizedDate, completed, levelCompleted });
+      const newLog = { date: normalizedDate, completed } as any;
+      if (levelCompleted) newLog.levelCompleted = levelCompleted;
+      logs.push(newLog);
     }
     
-    await saveUserData({ workoutLogs: logs });
+    // Clean array from any undefined fields just in case
+    const safeLogs = logs.map(l => Object.fromEntries(Object.entries(l).filter(([_, v]) => v !== undefined)));
+    
+    try {
+      await saveUserData({ workoutLogs: safeLogs as any });
+    } catch (e) {
+      console.warn("Handled save error:", e);
+    }
   };
 
   const clearUserData = () => {

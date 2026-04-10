@@ -15,6 +15,7 @@ import {
   Checkbox,
   Select,
   MenuItem,
+  Menu,
   InputLabel,
   FormControl,
   Alert,
@@ -45,7 +46,7 @@ interface DashboardProps {
   userData: UserData;
   onClear: () => void;
   onMilestoneCheckin: () => void;
-  onToggleWorkout?: (dateStr: string, completed: boolean) => void;
+  onToggleWorkout?: (dateStr: string, completed: boolean, type?: 'N' | 'C') => void;
   onUpdateData?: (data: Partial<UserData>) => void;
   syncError?: string | null;
 }
@@ -62,6 +63,7 @@ export default function Dashboard({
   const [openVideo, setOpenVideo] = useState(false);
   const [openLevelChange, setOpenLevelChange] = useState(false);
   const [newLevel, setNewLevel] = useState(userData.currentLevelId || "1B");
+  const [workoutMenuAnchor, setWorkoutMenuAnchor] = useState<{ anchorEl: HTMLElement, dateStr: string } | null>(null);
 
   const startDate = new Date(userData.startDate);
   const milestoneDate = addMonths(startDate, 6);
@@ -78,9 +80,9 @@ export default function Dashboard({
   
   const trackingDays = eachDayOfInterval({ start: startDateGrid, end: endDateGrid }).map((d) => format(d, "yyyy-MM-dd"));
 
-  const handleToggle = (dateStr: string, currentStatus: boolean) => {
+  const handleToggle = (dateStr: string, currentStatus: boolean, type?: 'N' | 'C') => {
     if (onToggleWorkout) {
-      onToggleWorkout(dateStr, !currentStatus);
+      onToggleWorkout(dateStr, !currentStatus, type);
     }
   };
 
@@ -382,7 +384,13 @@ export default function Dashboard({
                     <Box display="flex" flexDirection="column" alignItems="center" mt={0.5}>
                       <Checkbox
                         checked={isCompleted}
-                        onChange={() => handleToggle(dateStr, isCompleted)}
+                        onChange={(e) => {
+                          if (isCompleted) {
+                            handleToggle(dateStr, true); // uncheck
+                          } else {
+                            setWorkoutMenuAnchor({ anchorEl: e.currentTarget, dateStr });
+                          }
+                        }}
                         color="secondary"
                         size="small"
                         sx={{ p: 0.5 }}
@@ -603,6 +611,21 @@ export default function Dashboard({
             </Box>
           </DialogContent>
         </Dialog>
+        {/* Workout Selection Menu */}
+        <Menu
+          anchorEl={workoutMenuAnchor?.anchorEl}
+          open={Boolean(workoutMenuAnchor)}
+          onClose={() => setWorkoutMenuAnchor(null)}
+        >
+          <MenuItem onClick={() => {
+            handleToggle(workoutMenuAnchor!.dateStr, false, 'N');
+            setWorkoutMenuAnchor(null);
+          }}>Navy Seals (N)</MenuItem>
+          <MenuItem onClick={() => {
+            handleToggle(workoutMenuAnchor!.dateStr, false, 'C');
+            setWorkoutMenuAnchor(null);
+          }}>6-counts (C)</MenuItem>
+        </Menu>
       </motion.div>
     </Box>
   );
