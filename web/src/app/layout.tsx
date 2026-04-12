@@ -18,8 +18,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Busy Dad Program",
-  description: "Burpee Workout App for the Busy Dad Program",
+  title: "BurpeePacer | The Elite Burpee Tracker",
+  description: "The official BurpeePacer app. Track your landmarks, set your pace, and master the Busy Dad Program.",
 };
 
 export default function RootLayout({
