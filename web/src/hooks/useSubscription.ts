@@ -1,9 +1,9 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { db } from '@/lib/firebase';
-import { doc, onSnapshot } from 'firebase/firestore';
-import { isAllowlisted } from '@/lib/allowlist';
+import { useState, useEffect } from "react";
+import { db } from "@/lib/firebase";
+import { doc, onSnapshot } from "firebase/firestore";
+import { isAllowlisted } from "@/lib/allowlist";
 
 interface SubscriptionState {
   isPro: boolean;
@@ -12,7 +12,10 @@ interface SubscriptionState {
   loading: boolean;
 }
 
-export function useSubscription(userId: string | null, userEmail?: string | null): SubscriptionState {
+export function useSubscription(
+  userId: string | null,
+  userEmail?: string | null,
+): SubscriptionState {
   const [state, setState] = useState<SubscriptionState>({
     isPro: false,
     stripeCustomerId: null,
@@ -23,16 +26,21 @@ export function useSubscription(userId: string | null, userEmail?: string | null
   useEffect(() => {
     // Allowlisted users (admin + friends/family) always get Pro
     if (isAllowlisted(userEmail)) {
-      setState({ isPro: true, stripeCustomerId: null, subscriptionStatus: 'active', loading: false });
+      setState({
+        isPro: true,
+        stripeCustomerId: null,
+        subscriptionStatus: "active",
+        loading: false,
+      });
       return;
     }
 
     if (!userId || !db) {
-      setState(s => ({ ...s, loading: false }));
+      setState((s) => ({ ...s, loading: false }));
       return;
     }
 
-    const userRef = doc(db, 'users', userId);
+    const userRef = doc(db, "users", userId);
     const unsubscribe = onSnapshot(userRef, (snap) => {
       if (snap.exists()) {
         const data = snap.data();
@@ -43,7 +51,12 @@ export function useSubscription(userId: string | null, userEmail?: string | null
           loading: false,
         });
       } else {
-        setState({ isPro: false, stripeCustomerId: null, subscriptionStatus: null, loading: false });
+        setState({
+          isPro: false,
+          stripeCustomerId: null,
+          subscriptionStatus: null,
+          loading: false,
+        });
       }
     });
 

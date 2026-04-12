@@ -1,12 +1,15 @@
-import { NextRequest, NextResponse } from 'next/server';
-import stripe from '@/lib/stripe';
+import { NextRequest, NextResponse } from "next/server";
+import stripe from "@/lib/stripe";
 
 export async function POST(req: NextRequest) {
   try {
     const { customerId } = await req.json();
 
     if (!customerId) {
-      return NextResponse.json({ error: 'Missing customerId' }, { status: 400 });
+      return NextResponse.json(
+        { error: "Missing customerId" },
+        { status: 400 },
+      );
     }
 
     // Use env var if set (production), otherwise derive from the incoming request origin (local dev)
@@ -20,7 +23,10 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ url: session.url });
   } catch (err) {
-    console.error('Stripe portal error:', err);
-    return NextResponse.json({ error: 'Failed to create portal session' }, { status: 500 });
+    console.error("Stripe portal error:", err);
+    return NextResponse.json(
+      { error: "Failed to create portal session" },
+      { status: 500 },
+    );
   }
 }

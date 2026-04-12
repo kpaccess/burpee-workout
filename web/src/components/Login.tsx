@@ -1,7 +1,16 @@
 "use client";
 
 import React, { useState } from "react";
-import { Box, Card, Typography, TextField, Button, Alert, InputAdornment, IconButton } from "@mui/material";
+import {
+  Box,
+  Card,
+  Typography,
+  TextField,
+  Button,
+  Alert,
+  InputAdornment,
+  IconButton,
+} from "@mui/material";
 import { Visibility, VisibilityOff } from "@mui/icons-material";
 import { motion } from "framer-motion";
 import {
@@ -42,13 +51,18 @@ export default function Login({ onBackToInfo }: LoginProps) {
       }
       router.push("/");
     } catch (err) {
-      const code = (err as { code?: string }).code ?? '';
-      if (code === 'auth/invalid-credential' || code === 'auth/wrong-password') {
-        setError('Incorrect email or password. If you haven\'t signed up yet, click "Don\'t have an account? Sign up" below.');
-      } else if (code === 'auth/user-not-found') {
-        setError('No account found with this email. Please sign up first.');
-      } else if (code === 'auth/email-already-in-use') {
-        setError('This email is already registered. Try signing in instead.');
+      const code = (err as { code?: string }).code ?? "";
+      if (
+        code === "auth/invalid-credential" ||
+        code === "auth/wrong-password"
+      ) {
+        setError(
+          "Incorrect email or password. If you haven't signed up yet, click \"Don't have an account? Sign up\" below.",
+        );
+      } else if (code === "auth/user-not-found") {
+        setError("No account found with this email. Please sign up first.");
+      } else if (code === "auth/email-already-in-use") {
+        setError("This email is already registered. Try signing in instead.");
       } else {
         setError((err as Error).message);
       }

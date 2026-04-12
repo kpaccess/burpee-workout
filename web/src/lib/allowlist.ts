@@ -1,12 +1,12 @@
 // Admin email — always gets full Pro access
-export const ADMIN_EMAIL = 'kpaccess@gmail.com';
+export const ADMIN_EMAIL = "kpaccess@gmail.com";
 
 // Friends & family — get free Pro access
 const ALLOWED_EMAILS: string[] = [
   ADMIN_EMAIL,
-  'ratheeshbabukp123@gmail.com',
-  'eartharoma60@gmail.com',
-  'hassank15@gmail.com',
+  "ratheeshbabukp123@gmail.com",
+  "eartharoma60@gmail.com",
+  "hassank15@gmail.com",
 ];
 
 export function isAllowlisted(email: string | null | undefined): boolean {
