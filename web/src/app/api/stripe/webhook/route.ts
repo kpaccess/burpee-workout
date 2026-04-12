@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import stripe from "@/lib/stripe";
 import { db } from "@/lib/firebase";
 import { doc, setDoc } from "firebase/firestore";
-import Stripe from "stripe";
 
 // Must disable body parsing so Stripe can verify the raw body signature
 export const config = { api: { bodyParser: false } };
@@ -29,9 +28,13 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  let event: Stripe.Event;
+  let event: { type: string; data: { object: Record<string, unknown> } };
   try {
-    event = stripe.webhooks.constructEvent(body, sig, webhookSecret);
+    event = stripe.webhooks.constructEvent(
+      body,
+      sig,
+      webhookSecret,
+    ) as typeof event;
   } catch (err) {
     console.error("Webhook signature verification failed:", err);
     return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
@@ -41,7 +44,7 @@ export async function POST(req: NextRequest) {
     switch (event.type) {
       // Payment succeeded → unlock Pro
       case "checkout.session.completed": {
-        const session = event.data.object as Stripe.CheckoutSession;
+        const session = event.data.object as Record<string, any>;
         const firebaseUserId = session.metadata?.firebaseUserId;
         if (firebaseUserId) {
           await updateFirestoreUser(firebaseUserId, {
@@ -56,7 +59,7 @@ export async function POST(req: NextRequest) {
 
       // Subscription renewed successfully
       case "invoice.payment_succeeded": {
-        const invoice = event.data.object as Stripe.Invoice;
+        const invoice = event.data.object as Record<string, any>;
         const sub = await stripe.subscriptions.retrieve(
           invoice.subscription as string,
         );
@@ -72,7 +75,7 @@ export async function POST(req: NextRequest) {
 
       // Payment failed → downgrade
       case "invoice.payment_failed": {
-        const invoice = event.data.object as Stripe.Invoice;
+        const invoice = event.data.object as Record<string, any>;
         const sub = await stripe.subscriptions.retrieve(
           invoice.subscription as string,
         );
@@ -88,7 +91,7 @@ export async function POST(req: NextRequest) {
 
       // Subscription canceled
       case "customer.subscription.deleted": {
-        const sub = event.data.object as Stripe.Subscription;
+        const sub = event.data.object as Record<string, any>;
         const firebaseUserId = sub.metadata?.firebaseUserId;
         if (firebaseUserId) {
           await updateFirestoreUser(firebaseUserId, {
