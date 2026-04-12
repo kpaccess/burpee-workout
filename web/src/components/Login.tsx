@@ -6,7 +6,11 @@ import { motion } from 'framer-motion';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
 import { auth, missingFirebaseEnvVars } from '../lib/firebase';
 
-export default function Login() {
+interface LoginProps {
+  onBackToInfo?: () => void;
+}
+
+export default function Login({ onBackToInfo }: LoginProps) {
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -63,6 +67,11 @@ export default function Login() {
       }}
     >
       <Card sx={{ p: 4, maxWidth: 400, width: '100%' }}>
+        {onBackToInfo && (
+          <Button variant="text" size="small" onClick={onBackToInfo} sx={{ mb: 1.5 }}>
+            Back to info
+          </Button>
+        )}
         <Typography variant="h4" gutterBottom align="center" color="primary" fontWeight={800}>
           {isLogin ? 'Welcome Back' : 'Create Account'}
         </Typography>
@@ -74,24 +83,48 @@ export default function Login() {
         {message && <Alert severity="success" sx={{ mb: 2 }}>{message}</Alert>}
 
         <form onSubmit={handleAuth}>
-          <TextField
-            label="Email"
-            type="email"
-            fullWidth
-            required
-            margin="normal"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-          />
-          <TextField
-            label="Password"
-            type="password"
-            fullWidth
-            required
-            margin="normal"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-          />
+          <Box sx={{ mb: 2 }}>
+            <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.78)', mb: 0.75, fontWeight: 600 }}>
+              Email *
+            </Typography>
+            <TextField
+              type="email"
+              fullWidth
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              aria-label="Email"
+              sx={{
+                '& .MuiOutlinedInput-root': {
+                  backgroundColor: 'rgba(255, 255, 255, 0.04)',
+                  '& fieldset': { borderColor: 'rgba(255, 255, 255, 0.2)' },
+                  '&:hover fieldset': { borderColor: 'rgba(255, 255, 255, 0.35)' },
+                  '&.Mui-focused fieldset': { borderColor: 'primary.main' },
+                },
+              }}
+            />
+          </Box>
+          <Box sx={{ mb: 1 }}>
+            <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.78)', mb: 0.75, fontWeight: 600 }}>
+              Password *
+            </Typography>
+            <TextField
+              type="password"
+              fullWidth
+              required
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              aria-label="Password"
+              sx={{
+                '& .MuiOutlinedInput-root': {
+                  backgroundColor: 'rgba(255, 255, 255, 0.04)',
+                  '& fieldset': { borderColor: 'rgba(255, 255, 255, 0.2)' },
+                  '&:hover fieldset': { borderColor: 'rgba(255, 255, 255, 0.35)' },
+                  '&.Mui-focused fieldset': { borderColor: 'primary.main' },
+                },
+              }}
+            />
+          </Box>
           <Button
             type="submit"
             variant="contained"

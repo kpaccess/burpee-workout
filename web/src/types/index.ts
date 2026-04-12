@@ -18,6 +18,12 @@ export interface UserData {
   isGraduated?: boolean;
   workoutLogs?: WorkoutLog[];
   currentLevelId?: string;
+
+  // Stripe subscription
+  isPro?: boolean;
+  stripeCustomerId?: string;
+  stripeSubscriptionId?: string;
+  subscriptionStatus?: 'active' | 'canceled' | 'past_due' | 'trialing';
 }
 
 export interface LevelDescription {

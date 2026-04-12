@@ -6,12 +6,12 @@ import {
   TextInput,
   Button,
   ScrollView,
-  SafeAreaView,
   TouchableOpacity,
   ActivityIndicator,
   Modal,
   Linking,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import {
   differenceInDays,
   addMonths,

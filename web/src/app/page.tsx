@@ -6,6 +6,7 @@ import Onboarding from "../components/Onboarding";
 import Dashboard from "../components/Dashboard";
 import MilestoneCheckin from "../components/MilestoneCheckin";
 import Login from "../components/Login";
+import LandingPage from "../components/LandingPage";
 import { useAuth } from "../context/AuthContext";
 import {
   Alert,
@@ -27,6 +28,7 @@ export default function Home() {
   } = useUserData();
   const { user, loading: authLoading } = useAuth();
   const [showMilestoneCheckin, setShowMilestoneCheckin] = useState(false);
+  const [showProLogin, setShowProLogin] = useState(false);
 
   if (!isLoaded || authLoading) {
     return (
@@ -44,7 +46,10 @@ export default function Home() {
   }
 
   if (!user) {
-    return <Login />;
+    if (!showProLogin) {
+      return <LandingPage onStartPro={() => setShowProLogin(true)} />;
+    }
+    return <Login onBackToInfo={() => setShowProLogin(false)} />;
   }
 
   if (syncError && userData === undefined) {
