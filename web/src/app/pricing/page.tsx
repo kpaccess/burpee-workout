@@ -42,14 +42,14 @@ const PRO_FEATURES = [
 
 export default function PricingPage() {
   const { user } = useAuth();
-  const { isPro, stripeCustomerId, loading } = useSubscription(user?.uid ?? null);
+  const { isPro, stripeCustomerId, loading } = useSubscription(user?.uid ?? null, user?.email);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [portalLoading, setPortalLoading] = useState(false);
   const router = useRouter();
 
   const handleUpgrade = async () => {
     if (!user) {
-      router.push('/');
+      router.push('/login');
       return;
     }
     setCheckoutLoading(true);
@@ -270,7 +270,7 @@ export default function PricingPage() {
                   size="large"
                   startIcon={checkoutLoading ? <CircularProgress size={16} color="inherit" /> : <WorkspacePremiumIcon />}
                   onClick={handleUpgrade}
-                  disabled={checkoutLoading || !user}
+                  disabled={checkoutLoading}
                   sx={{
                     mt: 3,
                     py: 1.5,
@@ -283,7 +283,7 @@ export default function PricingPage() {
                     },
                   }}
                 >
-                  {checkoutLoading ? 'Redirecting...' : user ? 'Upgrade to Pro' : 'Sign in to Upgrade'}
+                  {checkoutLoading ? 'Redirecting...' : user ? 'Upgrade to Pro' : 'Sign in & Upgrade'}
                 </Button>
               )}
             </CardContent>

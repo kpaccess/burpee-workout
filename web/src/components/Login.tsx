@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useState } from "react";
-import { Box, Card, Typography, TextField, Button, Alert } from "@mui/material";
+import { Box, Card, Typography, TextField, Button, Alert, InputAdornment, IconButton } from "@mui/material";
+import { Visibility, VisibilityOff } from "@mui/icons-material";
 import { motion } from "framer-motion";
 import {
   signInWithEmailAndPassword,
@@ -9,17 +10,20 @@ import {
   sendPasswordResetEmail,
 } from "firebase/auth";
 import { auth, missingFirebaseEnvVars } from "../lib/firebase";
+import { useRouter } from "next/navigation";
 
 interface LoginProps {
   onBackToInfo?: () => void;
 }
 
 export default function Login({ onBackToInfo }: LoginProps) {
+  const router = useRouter();
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -36,8 +40,18 @@ export default function Login({ onBackToInfo }: LoginProps) {
       } else {
         await createUserWithEmailAndPassword(auth, email, password);
       }
+      router.push("/");
     } catch (err) {
-      setError((err as Error).message);
+      const code = (err as { code?: string }).code ?? '';
+      if (code === 'auth/invalid-credential' || code === 'auth/wrong-password') {
+        setError('Incorrect email or password. If you haven\'t signed up yet, click "Don\'t have an account? Sign up" below.');
+      } else if (code === 'auth/user-not-found') {
+        setError('No account found with this email. Please sign up first.');
+      } else if (code === 'auth/email-already-in-use') {
+        setError('This email is already registered. Try signing in instead.');
+      } else {
+        setError((err as Error).message);
+      }
     }
   };
 
@@ -153,12 +167,28 @@ export default function Login({ onBackToInfo }: LoginProps) {
               Password *
             </Typography>
             <TextField
-              type="password"
+              type={showPassword ? "text" : "password"}
               fullWidth
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               aria-label="Password"
+              slotProps={{
+                input: {
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <IconButton
+                        onClick={() => setShowPassword(!showPassword)}
+                        edge="end"
+                        size="small"
+                        sx={{ color: "rgba(255,255,255,0.5)" }}
+                      >
+                        {showPassword ? <VisibilityOff /> : <Visibility />}
+                      </IconButton>
+                    </InputAdornment>
+                  ),
+                },
+              }}
               sx={{
                 "& .MuiOutlinedInput-root": {
                   backgroundColor: "rgba(255, 255, 255, 0.04)",

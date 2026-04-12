@@ -17,11 +17,7 @@ import WorkspacePremiumIcon from "@mui/icons-material/WorkspacePremium";
 import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
 
-interface LandingPageProps {
-  onStartPro: () => void;
-}
-
-export default function LandingPage({ onStartPro }: LandingPageProps) {
+export default function LandingPage() {
   const router = useRouter();
   const weeklySchedule = [
     { day: "Mon", train: true },
@@ -92,7 +88,7 @@ export default function LandingPage({ onStartPro }: LandingPageProps) {
                 variant="contained"
                 size="large"
                 startIcon={<WorkspacePremiumIcon />}
-                onClick={onStartPro}
+                onClick={() => router.push("/pricing")}
               >
                 Become Pro Member
               </Button>
@@ -102,6 +98,14 @@ export default function LandingPage({ onStartPro }: LandingPageProps) {
                 onClick={() => router.push("/pricing")}
               >
                 See Pro Plans
+              </Button>
+              <Button
+                variant="text"
+                size="large"
+                onClick={() => router.push("/login")}
+                sx={{ color: "text.secondary" }}
+              >
+                Already a member? Sign in
               </Button>
             </Stack>
           </Stack>

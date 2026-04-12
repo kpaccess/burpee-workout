@@ -1,19 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 import stripe from '@/lib/stripe';
 import { db } from '@/lib/firebase';
-import { doc, updateDoc } from 'firebase/firestore';
+import { doc, setDoc } from 'firebase/firestore';
 import Stripe from 'stripe';
 
 // Must disable body parsing so Stripe can verify the raw body signature
 export const config = { api: { bodyParser: false } };
 
+// setDoc with merge:true works whether the doc exists or not
 async function updateFirestoreUser(
   firebaseUserId: string,
   data: Record<string, unknown>
 ) {
   if (!db) return;
   const userRef = doc(db, 'users', firebaseUserId);
-  await updateDoc(userRef, data);
+  await setDoc(userRef, data, { merge: true });
 }
 
 export async function POST(req: NextRequest) {

@@ -9,9 +9,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing customerId' }, { status: 400 });
     }
 
+    // Use env var if set (production), otherwise derive from the incoming request origin (local dev)
+    const { origin } = new URL(req.url);
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || origin;
+
     const session = await stripe.billingPortal.sessions.create({
       customer: customerId,
-      return_url: `${process.env.NEXT_PUBLIC_APP_URL}/`,
+      return_url: `${baseUrl}/`,
     });
 
     return NextResponse.json({ url: session.url });

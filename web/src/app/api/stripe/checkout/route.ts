@@ -14,14 +14,18 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Stripe price ID not configured' }, { status: 500 });
     }
 
+    // Use env var if set (production), otherwise derive from the incoming request origin (local dev)
+    const { origin } = new URL(req.url);
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || origin;
+
     const session = await stripe.checkout.sessions.create({
       mode: 'subscription',
       payment_method_types: ['card'],
       customer_email: userEmail ?? undefined,
       line_items: [{ price: priceId, quantity: 1 }],
       metadata: { firebaseUserId: userId },
-      success_url: `${process.env.NEXT_PUBLIC_APP_URL}/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/pricing`,
+      success_url: `${baseUrl}/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${baseUrl}/pricing`,
       subscription_data: {
         metadata: { firebaseUserId: userId },
       },

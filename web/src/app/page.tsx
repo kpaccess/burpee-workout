@@ -28,7 +28,6 @@ export default function Home() {
   } = useUserData();
   const { user, loading: authLoading } = useAuth();
   const [showMilestoneCheckin, setShowMilestoneCheckin] = useState(false);
-  const [showProLogin, setShowProLogin] = useState(false);
 
   if (!isLoaded || authLoading) {
     return (
@@ -46,10 +45,7 @@ export default function Home() {
   }
 
   if (!user) {
-    if (!showProLogin) {
-      return <LandingPage onStartPro={() => setShowProLogin(true)} />;
-    }
-    return <Login onBackToInfo={() => setShowProLogin(false)} />;
+    return <LandingPage />;
   }
 
   if (syncError && userData === undefined) {

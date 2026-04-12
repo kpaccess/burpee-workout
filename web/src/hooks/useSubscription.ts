@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { db } from '@/lib/firebase';
 import { doc, onSnapshot } from 'firebase/firestore';
+import { isAllowlisted } from '@/lib/allowlist';
 
 interface SubscriptionState {
   isPro: boolean;
@@ -11,7 +12,7 @@ interface SubscriptionState {
   loading: boolean;
 }
 
-export function useSubscription(userId: string | null): SubscriptionState {
+export function useSubscription(userId: string | null, userEmail?: string | null): SubscriptionState {
   const [state, setState] = useState<SubscriptionState>({
     isPro: false,
     stripeCustomerId: null,
@@ -20,6 +21,12 @@ export function useSubscription(userId: string | null): SubscriptionState {
   });
 
   useEffect(() => {
+    // Allowlisted users (admin + friends/family) always get Pro
+    if (isAllowlisted(userEmail)) {
+      setState({ isPro: true, stripeCustomerId: null, subscriptionStatus: 'active', loading: false });
+      return;
+    }
+
     if (!userId || !db) {
       setState(s => ({ ...s, loading: false }));
       return;
@@ -41,7 +48,7 @@ export function useSubscription(userId: string | null): SubscriptionState {
     });
 
     return () => unsubscribe();
-  }, [userId]);
+  }, [userId, userEmail]);
 
   return state;
 }
