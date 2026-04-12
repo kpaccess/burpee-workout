@@ -1,7 +1,15 @@
 "use client";
 
 import React from "react";
-import { Box, Button, Card, Chip, Grid, Stack, Typography } from "@mui/material";
+import {
+  Box,
+  Button,
+  Card,
+  Chip,
+  Grid,
+  Stack,
+  Typography,
+} from "@mui/material";
 import FitnessCenterIcon from "@mui/icons-material/FitnessCenter";
 import MilitaryTechIcon from "@mui/icons-material/MilitaryTech";
 import BoltIcon from "@mui/icons-material/Bolt";
@@ -36,7 +44,10 @@ export default function LandingPage({ onStartPro }: LandingPageProps) {
       }}
     >
       <Box sx={{ maxWidth: 1100, mx: "auto" }}>
-        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}>
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
           <Stack spacing={2} alignItems="flex-start" mb={5}>
             <Chip
               icon={<FitnessCenterIcon />}
@@ -47,21 +58,49 @@ export default function LandingPage({ onStartPro }: LandingPageProps) {
                 border: "1px solid rgba(255,255,255,0.18)",
               }}
             />
-            <Typography variant="h2" sx={{ fontWeight: 900, lineHeight: 1.05, maxWidth: 780 }}>
+            <Typography
+              variant="h2"
+              sx={{ fontWeight: 900, lineHeight: 1.05, maxWidth: 780 }}
+            >
               Burpees: Simple, Brutal,
-              <Box component="span" sx={{ color: "primary.main" }}> and Proven</Box>
+              <Box component="span" sx={{ color: "primary.main" }}>
+                {" "}
+                and Proven
+              </Box>
             </Typography>
-            <Typography variant="h6" color="text.secondary" sx={{ maxWidth: 760 }}>
-              Learn the story behind the burpee, why it still works, and when to train with push-ups vs without push-ups.
+            <Typography
+              variant="h6"
+              color="text.secondary"
+              sx={{ maxWidth: 760 }}
+            >
+              Learn the story behind the burpee, why it still works, and when to
+              train with push-ups vs without push-ups.
             </Typography>
-            <Typography variant="body1" sx={{ maxWidth: 760, color: "rgba(255,255,255,0.86)", fontWeight: 600 }}>
-              Consistency is the real secret. Follow your schedule, show up on your training days, and progress compounds.
+            <Typography
+              variant="body1"
+              sx={{
+                maxWidth: 760,
+                color: "rgba(255,255,255,0.86)",
+                fontWeight: 600,
+              }}
+            >
+              Consistency is the real secret. Follow your schedule, show up on
+              your training days, and progress compounds.
             </Typography>
             <Stack direction={{ xs: "column", sm: "row" }} spacing={2} pt={1}>
-              <Button variant="contained" size="large" startIcon={<WorkspacePremiumIcon />} onClick={onStartPro}>
+              <Button
+                variant="contained"
+                size="large"
+                startIcon={<WorkspacePremiumIcon />}
+                onClick={onStartPro}
+              >
                 Become Pro Member
               </Button>
-              <Button variant="outlined" size="large" onClick={() => router.push("/pricing")}>
+              <Button
+                variant="outlined"
+                size="large"
+                onClick={() => router.push("/pricing")}
+              >
                 See Pro Plans
               </Button>
             </Stack>
@@ -75,10 +114,17 @@ export default function LandingPage({ onStartPro }: LandingPageProps) {
                 Who Started the Burpee?
               </Typography>
               <Typography variant="body1" color="text.secondary" mb={2}>
-                The exercise was created by Royal H. Burpee, a U.S. physiologist, in 1939 as a quick full-body fitness test. It later became popular in military conditioning and functional training because it builds conditioning fast with no equipment.
+                The exercise was created by Royal H. Burpee, a U.S.
+                physiologist, in 1939 as a quick full-body fitness test. It
+                later became popular in military conditioning and functional
+                training because it builds conditioning fast with no equipment.
               </Typography>
               <Stack direction="row" spacing={1} flexWrap="wrap">
-                <Chip size="small" icon={<MilitaryTechIcon />} label="Origin: 1939" />
+                <Chip
+                  size="small"
+                  icon={<MilitaryTechIcon />}
+                  label="Origin: 1939"
+                />
                 <Chip size="small" icon={<BoltIcon />} label="No equipment" />
               </Stack>
             </Card>
@@ -89,13 +135,16 @@ export default function LandingPage({ onStartPro }: LandingPageProps) {
                 Why Burpees Work
               </Typography>
               <Typography variant="body1" color="text.secondary" mb={1}>
-                Burpees train legs, core, chest, shoulders, and lungs at the same time.
+                Burpees train legs, core, chest, shoulders, and lungs at the
+                same time.
               </Typography>
               <Typography variant="body1" color="text.secondary" mb={1}>
-                They improve work capacity, cardiovascular fitness, and mental toughness in short sessions.
+                They improve work capacity, cardiovascular fitness, and mental
+                toughness in short sessions.
               </Typography>
               <Typography variant="body1" color="text.secondary">
-                They are easy to scale from beginner to advanced and perfect for consistency-based programs.
+                They are easy to scale from beginner to advanced and perfect for
+                consistency-based programs.
               </Typography>
             </Card>
           </Grid>
@@ -114,10 +163,12 @@ export default function LandingPage({ onStartPro }: LandingPageProps) {
             Consistency Over Intensity
           </Typography>
           <Typography variant="body1" color="text.secondary" mb={1}>
-            The most important rule is simple: stick to your schedule. Miss less, and your results improve month after month.
+            The most important rule is simple: stick to your schedule. Miss
+            less, and your results improve month after month.
           </Typography>
           <Typography variant="body1" color="text.secondary" mb={2}>
-            BurpeePacer Pro is built for this exact goal: track every workout, keep your streak visible, and stay accountable to your plan.
+            BurpeePacer Pro is built for this exact goal: track every workout,
+            keep your streak visible, and stay accountable to your plan.
           </Typography>
           <Typography variant="subtitle1" fontWeight={700} mb={1.2}>
             Weekly Schedule (Example)
@@ -125,7 +176,10 @@ export default function LandingPage({ onStartPro }: LandingPageProps) {
           <Box
             sx={{
               display: "grid",
-              gridTemplateColumns: { xs: "repeat(2, minmax(0, 1fr))", sm: "repeat(7, minmax(0, 1fr))" },
+              gridTemplateColumns: {
+                xs: "repeat(2, minmax(0, 1fr))",
+                sm: "repeat(7, minmax(0, 1fr))",
+              },
               gap: 1,
               mb: 2,
             }}
@@ -139,14 +193,27 @@ export default function LandingPage({ onStartPro }: LandingPageProps) {
                   py: 1.1,
                   textAlign: "center",
                   border: "1px solid",
-                  borderColor: item.train ? "rgba(255,51,102,0.55)" : "rgba(255,255,255,0.18)",
-                  background: item.train ? "rgba(255,51,102,0.14)" : "rgba(255,255,255,0.03)",
+                  borderColor: item.train
+                    ? "rgba(255,51,102,0.55)"
+                    : "rgba(255,255,255,0.18)",
+                  background: item.train
+                    ? "rgba(255,51,102,0.14)"
+                    : "rgba(255,255,255,0.03)",
                 }}
               >
-                <Typography variant="body2" fontWeight={800} color={item.train ? "primary.main" : "text.secondary"}>
+                <Typography
+                  variant="body2"
+                  fontWeight={800}
+                  color={item.train ? "primary.main" : "text.secondary"}
+                >
                   {item.day}
                 </Typography>
-                <Typography variant="caption" color={item.train ? "rgba(255,255,255,0.9)" : "text.secondary"}>
+                <Typography
+                  variant="caption"
+                  color={
+                    item.train ? "rgba(255,255,255,0.9)" : "text.secondary"
+                  }
+                >
                   {item.train ? "Train" : "Recover"}
                 </Typography>
               </Box>
@@ -155,21 +222,36 @@ export default function LandingPage({ onStartPro }: LandingPageProps) {
           <Stack direction={{ xs: "column", sm: "row" }} spacing={1.2}>
             <Chip label="Follow the schedule" color="secondary" />
             <Chip label="Track every session" color="primary" />
-            <Chip label="Pro helps you stay consistent" sx={{ bgcolor: "rgba(255,255,255,0.1)", color: "white" }} />
+            <Chip
+              label="Pro helps you stay consistent"
+              sx={{ bgcolor: "rgba(255,255,255,0.1)", color: "white" }}
+            />
           </Stack>
         </Card>
 
         <Grid container spacing={3}>
           <Grid sx={{ xs: 12, md: 6 }}>
-            <Card sx={{ p: 3.5, border: "1px solid rgba(0,229,255,0.35)", height: "100%" }}>
-              <Typography variant="h5" fontWeight={800} mb={1.5} color="secondary.main">
+            <Card
+              sx={{
+                p: 3.5,
+                border: "1px solid rgba(0,229,255,0.35)",
+                height: "100%",
+              }}
+            >
+              <Typography
+                variant="h5"
+                fontWeight={800}
+                mb={1.5}
+                color="secondary.main"
+              >
                 Burpee Without Push-up
               </Typography>
               <Typography variant="body1" color="text.secondary" mb={1}>
                 Best for beginners, high-volume days, and steady conditioning.
               </Typography>
               <Typography variant="body1" color="text.secondary" mb={1}>
-                Lower upper-body fatigue and faster reps make it easier to maintain pace.
+                Lower upper-body fatigue and faster reps make it easier to
+                maintain pace.
               </Typography>
               <Typography variant="body1" color="text.secondary">
                 Good choice when your goal is consistency and daily completion.
@@ -177,18 +259,31 @@ export default function LandingPage({ onStartPro }: LandingPageProps) {
             </Card>
           </Grid>
           <Grid sx={{ xs: 12, md: 6 }}>
-            <Card sx={{ p: 3.5, border: "1px solid rgba(255,51,102,0.45)", height: "100%" }}>
-              <Typography variant="h5" fontWeight={800} mb={1.5} color="primary.main">
+            <Card
+              sx={{
+                p: 3.5,
+                border: "1px solid rgba(255,51,102,0.45)",
+                height: "100%",
+              }}
+            >
+              <Typography
+                variant="h5"
+                fontWeight={800}
+                mb={1.5}
+                color="primary.main"
+              >
                 Burpee With Push-up
               </Typography>
               <Typography variant="body1" color="text.secondary" mb={1}>
                 Adds chest, triceps, and shoulder strength with each rep.
               </Typography>
               <Typography variant="body1" color="text.secondary" mb={1}>
-                Increases time-under-tension and difficulty, useful for progressive overload.
+                Increases time-under-tension and difficulty, useful for
+                progressive overload.
               </Typography>
               <Typography variant="body1" color="text.secondary">
-                Better for intermediate and advanced athletes who want a harder full-body stimulus.
+                Better for intermediate and advanced athletes who want a harder
+                full-body stimulus.
               </Typography>
             </Card>
           </Grid>
