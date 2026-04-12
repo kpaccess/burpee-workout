@@ -18,7 +18,7 @@ export const saveUserDataDB = async (userId: string, data: Partial<UserData>) =>
   await setDoc(docRef, data, { merge: true });
 };
 
-export const logWorkoutDB = async (userId: string, targetDate: string, completed: boolean) => {
+export const logWorkoutDB = async (userId: string, targetDate: string, completed: boolean, type?: 'N' | 'C') => {
   if (!db) return;
   const docRef = doc(db, 'users', userId);
   const docSnap = await getDoc(docRef);
@@ -32,8 +32,10 @@ export const logWorkoutDB = async (userId: string, targetDate: string, completed
   const index = logs.findIndex(l => l.date === targetDate);
   if (index >= 0) {
     logs[index].completed = completed;
-  } else {
-    logs.push({ date: targetDate, completed });
+    if (completed) logs[index].workoutType = type;
+    else delete logs[index].workoutType;
+  } else if (completed) {
+    logs.push({ date: targetDate, completed, workoutType: type });
   }
 
   await updateDoc(docRef, { workoutLogs: logs });

@@ -2,6 +2,7 @@ export interface WorkoutLog {
   date: string; // YYYY-MM-DD
   completed: boolean;
   levelCompleted?: string;
+  workoutType?: 'N' | 'C'; // N = Navy Seals, C = 6-counts
   notes?: string;
 }
 

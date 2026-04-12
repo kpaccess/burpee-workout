@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { Box, Card, Typography, TextField, Button, Alert } from '@mui/material';
 import { motion } from 'framer-motion';
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
 import { auth, missingFirebaseEnvVars } from '../lib/firebase';
 
 export default function Login() {
@@ -11,6 +11,7 @@ export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [message, setMessage] = useState('');
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -27,8 +28,24 @@ export default function Login() {
       } else {
         await createUserWithEmailAndPassword(auth, email, password);
       }
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  };
+
+  const handleResetPassword = async () => {
+    setError('');
+    setMessage('');
+    if (!auth) return;
+    if (!email) {
+      setError('Please enter your email address above to reset your password.');
+      return;
+    }
+    try {
+      await sendPasswordResetEmail(auth, email);
+      setMessage('Password reset email sent! Check your inbox.');
+    } catch (err) {
+      setError((err as Error).message);
     }
   };
 
@@ -54,6 +71,7 @@ export default function Login() {
         </Typography>
 
         {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+        {message && <Alert severity="success" sx={{ mb: 2 }}>{message}</Alert>}
 
         <form onSubmit={handleAuth}>
           <TextField
@@ -86,10 +104,22 @@ export default function Login() {
           </Button>
         </form>
 
+        {isLogin && (
+          <Box display="flex" justifyContent="center" mb={1} mt={1}>
+            <Button variant="text" size="small" onClick={handleResetPassword}>
+              Forgot Password?
+            </Button>
+          </Box>
+        )}
+
         <Button
           fullWidth
           variant="text"
-          onClick={() => setIsLogin(!isLogin)}
+          onClick={() => {
+            setIsLogin(!isLogin);
+            setError('');
+            setMessage('');
+          }}
         >
           {isLogin ? "Don't have an account? Sign up" : 'Already have an account? Sign in'}
         </Button>
