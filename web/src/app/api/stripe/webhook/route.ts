@@ -3,9 +3,6 @@ import stripe from "@/lib/stripe";
 import { db } from "@/lib/firebase";
 import { doc, setDoc } from "firebase/firestore";
 
-// Must disable body parsing so Stripe can verify the raw body signature
-export const config = { api: { bodyParser: false } };
-
 // setDoc with merge:true works whether the doc exists or not
 async function updateFirestoreUser(
   firebaseUserId: string,
@@ -28,13 +25,10 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  let event: { type: string; data: { object: Record<string, unknown> } };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let event: any;
   try {
-    event = stripe.webhooks.constructEvent(
-      body,
-      sig,
-      webhookSecret,
-    ) as typeof event;
+    event = stripe.webhooks.constructEvent(body, sig, webhookSecret);
   } catch (err) {
     console.error("Webhook signature verification failed:", err);
     return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
