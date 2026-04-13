@@ -24,17 +24,8 @@ import { useAuth } from "@/context/AuthContext";
 import { useSubscription } from "@/hooks/useSubscription";
 import { useRouter } from "next/navigation";
 
-const FREE_FEATURES = [
-  "Track daily burpee workouts",
-  "7-day workout history",
-  "Basic level progress",
-  "Firebase sync across devices",
-];
-
 const PRO_FEATURES = [
-  "Everything in Free",
   "Full calendar history (all time)",
-  "Detailed workout analytics & trends",
   "Export workout data (CSV)",
   "Advanced workout timer with intervals",
   "Priority support",
@@ -49,18 +40,17 @@ export default function PricingPage() {
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [portalLoading, setPortalLoading] = useState(false);
   const router = useRouter();
-
   const handleUpgrade = async () => {
-    if (!user) {
-      router.push("/login");
-      return;
-    }
     setCheckoutLoading(true);
     try {
       const res = await fetch("/api/stripe/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: user.uid, userEmail: user.email }),
+        // Pass user credentials if logged in; guests pay first and sign up after
+        body: JSON.stringify({
+          userId: user?.uid ?? null,
+          userEmail: user?.email ?? null,
+        }),
       });
       const { url, error } = await res.json();
       if (error) throw new Error(error);
@@ -128,73 +118,8 @@ export default function PricingPage() {
           </Typography>
         </Box>
 
-        {/* Pricing Cards */}
-        <Box
-          sx={{
-            display: "grid",
-            gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" },
-            gap: 3,
-          }}
-        >
-          {/* Free Plan */}
-          <Card
-            sx={{
-              borderRadius: 3,
-              background: "rgba(255,255,255,0.05)",
-              border: "1px solid rgba(255,255,255,0.1)",
-              backdropFilter: "blur(10px)",
-            }}
-          >
-            <CardContent sx={{ p: 4 }}>
-              <Typography variant="overline" color="grey.500" fontWeight={700}>
-                Free
-              </Typography>
-              <Typography
-                variant="h4"
-                fontWeight={800}
-                color="white"
-                sx={{ mt: 1, mb: 0.5 }}
-              >
-                $0
-              </Typography>
-              <Typography variant="body2" color="grey.500" sx={{ mb: 3 }}>
-                Forever free
-              </Typography>
-              <Divider sx={{ borderColor: "rgba(255,255,255,0.1)", mb: 3 }} />
-              <List dense disablePadding>
-                {FREE_FEATURES.map((f) => (
-                  <ListItem key={f} disablePadding sx={{ mb: 1 }}>
-                    <ListItemIcon sx={{ minWidth: 32 }}>
-                      <CheckCircleIcon
-                        sx={{ color: "success.light", fontSize: 18 }}
-                      />
-                    </ListItemIcon>
-                    <ListItemText
-                      primary={f}
-                      primaryTypographyProps={{
-                        color: "grey.300",
-                        fontSize: 14,
-                      }}
-                    />
-                  </ListItem>
-                ))}
-              </List>
-              <Button
-                fullWidth
-                variant="outlined"
-                disabled
-                sx={{
-                  mt: 3,
-                  borderColor: "rgba(255,255,255,0.2)",
-                  color: "grey.500",
-                }}
-              >
-                Current Plan
-              </Button>
-            </CardContent>
-          </Card>
-
-          {/* Pro Plan */}
+        {/* Pro Plan — single centered card */}
+        <Box sx={{ display: "flex", justifyContent: "center" }}>
           <Card
             sx={{
               borderRadius: 3,
@@ -204,11 +129,13 @@ export default function PricingPage() {
               backdropFilter: "blur(10px)",
               position: "relative",
               overflow: "visible",
+              width: "100%",
+              maxWidth: 480,
             }}
           >
-            {/* Popular badge */}
+            {/* Pro badge */}
             <Chip
-              label="MOST POPULAR"
+              label="PRO"
               size="small"
               icon={
                 <WorkspacePremiumIcon sx={{ fontSize: "14px !important" }} />
@@ -222,16 +149,10 @@ export default function PricingPage() {
                 color: "white",
                 fontWeight: 700,
                 fontSize: 11,
+                px: 1,
               }}
             />
             <CardContent sx={{ p: 4 }}>
-              <Typography
-                variant="overline"
-                sx={{ color: "#f59e0b" }}
-                fontWeight={700}
-              >
-                Pro
-              </Typography>
               <Box
                 sx={{
                   display: "flex",
@@ -241,10 +162,10 @@ export default function PricingPage() {
                   mb: 0.5,
                 }}
               >
-                <Typography variant="h4" fontWeight={800} color="white">
+                <Typography variant="h3" fontWeight={800} color="white">
                   $4.99
                 </Typography>
-                <Typography variant="body2" color="grey.400">
+                <Typography variant="body1" color="grey.400">
                   / month
                 </Typography>
               </Box>
@@ -254,18 +175,17 @@ export default function PricingPage() {
               <Divider sx={{ borderColor: "rgba(255,255,255,0.1)", mb: 3 }} />
               <List dense disablePadding>
                 {PRO_FEATURES.map((f) => (
-                  <ListItem key={f} disablePadding sx={{ mb: 1 }}>
-                    <ListItemIcon sx={{ minWidth: 32 }}>
+                  <ListItem key={f} disablePadding sx={{ mb: 1.5 }}>
+                    <ListItemIcon sx={{ minWidth: 36 }}>
                       <CheckCircleIcon
-                        sx={{ color: "#f59e0b", fontSize: 18 }}
+                        sx={{ color: "#f59e0b", fontSize: 20 }}
                       />
                     </ListItemIcon>
                     <ListItemText
                       primary={f}
                       primaryTypographyProps={{
                         color: "white",
-                        fontSize: 14,
-                        fontWeight: f.includes("Everything") ? 600 : 400,
+                        fontSize: 15,
                       }}
                     />
                   </ListItem>

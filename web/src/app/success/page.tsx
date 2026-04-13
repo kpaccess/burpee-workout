@@ -28,18 +28,18 @@ export default function SuccessPage() {
       </Typography>
       <Typography variant="body1" color="grey.400" maxWidth={400}>
         Your subscription is active. Create your account now to start tracking
-        your workouts.
+        your workouts and unlock all Pro features.
       </Typography>
       <Button
         variant="contained"
-        onClick={() => router.push("/login")}
+        onClick={() => router.push("/login?signup=1")}
         sx={{
           mt: 2,
           background: "linear-gradient(135deg, #f59e0b, #ef4444)",
           fontWeight: 700,
         }}
       >
-        Create Account & Sign In
+        Create Account
       </Button>
     </Box>
   );

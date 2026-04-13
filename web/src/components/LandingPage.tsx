@@ -257,7 +257,7 @@ export default function LandingPage() {
                 Lower upper-body fatigue and faster reps make it easier to
                 maintain pace.
               </Typography>
-              <Typography variant="body1" color="text.secondary">
+              <Typography variant="body1" color="text.secondary" mb={2.5}>
                 Good choice when your goal is consistency and daily completion.
               </Typography>
             </Card>

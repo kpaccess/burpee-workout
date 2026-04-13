@@ -18,8 +18,32 @@ import {
   createUserWithEmailAndPassword,
   sendPasswordResetEmail,
 } from "firebase/auth";
-import { auth, missingFirebaseEnvVars } from "../lib/firebase";
+import { auth, db, missingFirebaseEnvVars } from "../lib/firebase";
+import { doc, getDoc, setDoc, deleteDoc } from "firebase/firestore";
 import { useRouter } from "next/navigation";
+
+// After a user signs up or logs in, check if they paid before creating an account
+// and automatically link the pending Pro subscription to their new Firebase user.
+async function claimPendingSubscription(uid: string, email: string) {
+  if (!db) return;
+  const pendingRef = doc(db, "pending_subscriptions", email.toLowerCase());
+  const pendingSnap = await getDoc(pendingRef);
+  if (!pendingSnap.exists()) return;
+
+  const data = pendingSnap.data();
+  const userRef = doc(db, "users", uid);
+  await setDoc(
+    userRef,
+    {
+      isPro: true,
+      stripeCustomerId: data.stripeCustomerId ?? null,
+      stripeSubscriptionId: data.stripeSubscriptionId ?? null,
+      subscriptionStatus: data.subscriptionStatus ?? "active",
+    },
+    { merge: true },
+  );
+  await deleteDoc(pendingRef);
+}
 
 interface LoginProps {
   onBackToInfo?: () => void;
@@ -27,11 +51,19 @@ interface LoginProps {
 
 export default function Login({ onBackToInfo }: LoginProps) {
   const router = useRouter();
-  const [isLogin, setIsLogin] = useState(true);
+  // Default to Sign Up if the user just completed a Stripe payment as a guest
+  const isSignupFlow =
+    typeof window !== "undefined" &&
+    new URLSearchParams(window.location.search).get("signup") === "1";
+  const [isLogin, setIsLogin] = useState(!isSignupFlow);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
-  const [message, setMessage] = useState("");
+  const [message, setMessage] = useState(
+    isSignupFlow
+      ? "🎉 Payment successful! Create your account below to activate your Pro access."
+      : "",
+  );
   const [showPassword, setShowPassword] = useState(false);
 
   const handleAuth = async (e: React.FormEvent) => {
@@ -44,12 +76,27 @@ export default function Login({ onBackToInfo }: LoginProps) {
       return;
     }
     try {
+      let credential;
       if (isLogin) {
-        await signInWithEmailAndPassword(auth, email, password);
+        credential = await signInWithEmailAndPassword(auth, email, password);
       } else {
-        await createUserWithEmailAndPassword(auth, email, password);
+        credential = await createUserWithEmailAndPassword(
+          auth,
+          email,
+          password,
+        );
       }
-      router.push("/");
+
+      // If the user paid via Stripe before creating an account, link the
+      // pending Pro subscription to their new Firebase account now.
+      await claimPendingSubscription(credential.user.uid, email);
+
+      const nextPath =
+        typeof window !== "undefined"
+          ? new URLSearchParams(window.location.search).get("next")
+          : null;
+      const destination = nextPath && nextPath.startsWith("/") ? nextPath : "/";
+      router.push(destination);
     } catch (err) {
       const code = (err as { code?: string }).code ?? "";
       if (

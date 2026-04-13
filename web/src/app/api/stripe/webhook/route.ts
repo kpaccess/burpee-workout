@@ -3,6 +3,16 @@ import stripe from "@/lib/stripe";
 import { db } from "@/lib/firebase";
 import { doc, setDoc } from "firebase/firestore";
 
+// Store a pending subscription keyed by email for users who paid before creating an account
+async function storePendingSubscription(
+  email: string,
+  data: Record<string, unknown>,
+) {
+  if (!db) return;
+  const pendingRef = doc(db, "pending_subscriptions", email.toLowerCase());
+  await setDoc(pendingRef, { ...data, createdAt: new Date().toISOString() });
+}
+
 // setDoc with merge:true works whether the doc exists or not
 async function updateFirestoreUser(
   firebaseUserId: string,
@@ -41,12 +51,26 @@ export async function POST(req: NextRequest) {
         const session = event.data.object as Record<string, any>;
         const firebaseUserId = session.metadata?.firebaseUserId;
         if (firebaseUserId) {
+          // Logged-in user: update their Firestore doc directly
           await updateFirestoreUser(firebaseUserId, {
             isPro: true,
             stripeCustomerId: session.customer,
             stripeSubscriptionId: session.subscription,
             subscriptionStatus: "active",
           });
+        } else {
+          // Guest checkout: store pending subscription by email so it can be
+          // claimed when the user creates their account on the login page
+          const customerEmail =
+            session.customer_details?.email ?? session.customer_email;
+          if (customerEmail) {
+            await storePendingSubscription(customerEmail, {
+              isPro: true,
+              stripeCustomerId: session.customer,
+              stripeSubscriptionId: session.subscription,
+              subscriptionStatus: "active",
+            });
+          }
         }
         break;
       }
