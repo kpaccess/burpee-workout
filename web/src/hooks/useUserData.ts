@@ -1,12 +1,14 @@
-import { useState, useEffect } from 'react';
-import { UserData } from '../types';
-import { useAuth } from '../context/AuthContext';
-import { getUserData, saveUserDataDB } from '../lib/db';
-import { toDateKey } from '../lib/date';
+import { useState, useEffect } from "react";
+import { UserData } from "../types";
+import { useAuth } from "../context/AuthContext";
+import { getUserData, saveUserDataDB } from "../lib/db";
+import { toDateKey } from "../lib/date";
 
 export function useUserData() {
   const { user } = useAuth();
-  const [userData, setUserData] = useState<UserData | null | undefined>(undefined);
+  const [userData, setUserData] = useState<UserData | null | undefined>(
+    undefined,
+  );
   const [syncError, setSyncError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -21,7 +23,7 @@ export function useUserData() {
 
       // Mark as loading for authenticated users while Firestore fetch runs.
       setUserData(undefined);
-      
+
       try {
         const data = await getUserData(user.uid);
         if (mounted) {
@@ -29,18 +31,20 @@ export function useUserData() {
           setSyncError(null);
         }
       } catch (err) {
-        console.error('Failed to load user data from Firebase', err);
+        console.error("Failed to load user data from Firebase", err);
         if (mounted) {
           // Keep undefined so UI doesn't look like a first-time user.
           setUserData(undefined);
-          setSyncError('Failed to load your data from Firebase.');
+          setSyncError("Failed to load your data from Firebase.");
         }
       }
     }
 
     loadFirebaseData();
-    
-    return () => { mounted = false; };
+
+    return () => {
+      mounted = false;
+    };
   }, [user]);
 
   const saveUserData = async (data: Partial<UserData>) => {
@@ -52,8 +56,10 @@ export function useUserData() {
       await saveUserDataDB(user.uid, newData);
       setSyncError(null);
     } catch (err) {
-      console.error('Failed to save user data to Firebase', err);
-      setSyncError('Failed to sync data. Please check your login and try again.');
+      console.error("Failed to save user data to Firebase", err);
+      setSyncError(
+        "Failed to sync data. Please check your login and try again.",
+      );
       throw err;
     }
   };
@@ -65,19 +71,25 @@ export function useUserData() {
   ) => {
     if (!user || !userData) return;
     const normalizedDate = toDateKey(dateStr);
-    
+    const isBeginnerTrack = userData.workoutTier === "beginner";
+
     // Create a deeper copy of logs to avoid read-only mutation issues
-    const logs = [...(userData.workoutLogs || [])].map(log => ({...log}));
-    const idx = logs.findIndex(l => toDateKey(l.date) === normalizedDate);
-    const typeSuffix = type ? `(${type})` : '';
-    const levelCompleted = completed ? `${userData.currentLevelId || ''}${typeSuffix}` : null;
+    const logs = [...(userData.workoutLogs || [])].map((log) => ({ ...log }));
+    const idx = logs.findIndex((l) => toDateKey(l.date) === normalizedDate);
+    const effectiveType = isBeginnerTrack ? "C" : type;
+    const typeSuffix = effectiveType ? `(${effectiveType})` : "";
+    const levelCompleted = completed
+      ? isBeginnerTrack
+        ? "Beginner"
+        : `${userData.currentLevelId || ""}${typeSuffix}`
+      : null;
     const workoutType =
-      type === "N"
+      effectiveType === "N"
         ? "with_pushups"
-        : type === "C"
+        : effectiveType === "C"
           ? "no_pushups"
           : undefined;
-    
+
     if (idx >= 0) {
       logs[idx].completed = completed;
       logs[idx].date = normalizedDate;
@@ -97,10 +109,12 @@ export function useUserData() {
       if (workoutType) newLog.workoutType = workoutType;
       logs.push(newLog);
     }
-    
+
     // Clean array from any undefined fields just in case
-    const safeLogs = logs.map(l => Object.fromEntries(Object.entries(l).filter(([_, v]) => v !== undefined)));
-    
+    const safeLogs = logs.map((l) =>
+      Object.fromEntries(Object.entries(l).filter(([_, v]) => v !== undefined)),
+    );
+
     try {
       await saveUserData({ workoutLogs: safeLogs as any });
     } catch (e) {
@@ -115,5 +129,12 @@ export function useUserData() {
 
   const isLoaded = !user || userData !== undefined || !!syncError;
 
-  return { userData, isLoaded, saveUserData, clearUserData, toggleWorkoutLog, syncError };
+  return {
+    userData,
+    isLoaded,
+    saveUserData,
+    clearUserData,
+    toggleWorkoutLog,
+    syncError,
+  };
 }

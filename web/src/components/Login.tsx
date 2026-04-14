@@ -23,7 +23,7 @@ import { doc, getDoc, setDoc, deleteDoc } from "firebase/firestore";
 import { useRouter } from "next/navigation";
 
 // After a user signs up or logs in, check if they paid before creating an account
-// and automatically link the pending Pro subscription to their new Firebase user.
+// and automatically link the pending advanced subscription to their new Firebase user.
 async function claimPendingSubscription(uid: string, email: string) {
   if (!db) return;
   const pendingRef = doc(db, "pending_subscriptions", email.toLowerCase());
@@ -61,7 +61,7 @@ export default function Login({ onBackToInfo }: LoginProps) {
   const [error, setError] = useState("");
   const [message, setMessage] = useState(
     isSignupFlow
-      ? "🎉 Payment successful! Create your account below to activate your Pro access."
+      ? "🎉 Payment successful! Create your account below to activate your advanced access."
       : "",
   );
   const [showPassword, setShowPassword] = useState(false);
@@ -88,7 +88,7 @@ export default function Login({ onBackToInfo }: LoginProps) {
       }
 
       // If the user paid via Stripe before creating an account, link the
-      // pending Pro subscription to their new Firebase account now.
+      // pending advanced subscription to their new Firebase account now.
       await claimPendingSubscription(credential.user.uid, email);
 
       const nextPath =

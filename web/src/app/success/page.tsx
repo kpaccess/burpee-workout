@@ -24,11 +24,11 @@ export default function SuccessPage() {
     >
       <CheckCircleOutlineIcon sx={{ fontSize: 80, color: "#f59e0b" }} />
       <Typography variant="h4" fontWeight={800} color="white">
-        Welcome to Pro!
+        Advanced Unlocked!
       </Typography>
       <Typography variant="body1" color="grey.400" maxWidth={400}>
         Your subscription is active. Create your account now to start tracking
-        your workouts and unlock all Pro features.
+        your workouts and unlock the advanced track.
       </Typography>
       <Button
         variant="contained"

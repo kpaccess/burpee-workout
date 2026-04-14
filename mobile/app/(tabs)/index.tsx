@@ -39,7 +39,7 @@ import * as Haptics from "expo-haptics";
 import { Ionicons } from "@expo/vector-icons";
 import { auth } from "../../lib/firebase";
 import { getUserData, saveUserDataDB } from "../../lib/db";
-import { UserData, LEVELS, WorkoutLog } from "../../types";
+import { UserData, LEVELS, WorkoutLog, WorkoutTier } from "../../types";
 import { WorkoutTimer } from "../../components/WorkoutTimer";
 
 export default function HomeScreen() {
@@ -59,6 +59,8 @@ export default function HomeScreen() {
   const [day1PictureDraft, setDay1PictureDraft] = useState<string | null>(null);
   const [syncError, setSyncError] = useState("");
   const [selectedLevelId, setSelectedLevelId] = useState("1B");
+  const [selectedWorkoutTier, setSelectedWorkoutTier] =
+    useState<WorkoutTier>("beginner");
 
   // Dashboard Modals
   const [showCheckinModal, setShowCheckinModal] = useState(false);
@@ -66,9 +68,13 @@ export default function HomeScreen() {
   const [checkinPicture, setCheckinPicture] = useState<string | null>(null);
 
   const [workoutModalVisible, setWorkoutModalVisible] = useState(false);
-  const [selectedDateForWorkout, setSelectedDateForWorkout] = useState<string | null>(null);
+  const [selectedDateForWorkout, setSelectedDateForWorkout] = useState<
+    string | null
+  >(null);
 
-  const [currentMonth, setCurrentMonth] = useState(() => startOfMonth(new Date()));
+  const [currentMonth, setCurrentMonth] = useState(() =>
+    startOfMonth(new Date()),
+  );
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (u) => {
@@ -106,11 +112,13 @@ export default function HomeScreen() {
 
   const startProgram = async () => {
     if (!weight || !user) return;
+    const isBeginnerTrack = selectedWorkoutTier === "beginner";
     const newData: UserData = {
       startDate: date,
       startWeight: parseFloat(weight),
       startPictureUrl: day1PictureDraft,
-      currentLevelId: selectedLevelId,
+      currentLevelId: isBeginnerTrack ? "1B" : selectedLevelId,
+      workoutTier: selectedWorkoutTier,
       workoutLogs: [],
     };
     try {
@@ -199,7 +207,8 @@ export default function HomeScreen() {
     }
   };
 
-  const toDateKey = (input: Date | string) => format(new Date(input), "yyyy-MM-dd");
+  const toDateKey = (input: Date | string) =>
+    format(new Date(input), "yyyy-MM-dd");
 
   const getWorkoutLogForDate = (dateStr: string): WorkoutLog | null => {
     if (!userData?.workoutLogs?.length) return null;
@@ -226,13 +235,21 @@ export default function HomeScreen() {
     }
   };
 
-  const handleToggleWorkout = async (dateStr: string, completed: boolean, type?: 'N' | 'C') => {
+  const handleToggleWorkout = async (
+    dateStr: string,
+    completed: boolean,
+    type?: "N" | "C",
+  ) => {
     if (!user || !userData) return;
 
     const key = toDateKey(dateStr);
     const logs = [...(userData.workoutLogs || [])];
     const idx = logs.findIndex((l) => toDateKey(l.date) === key);
-    const currentLevelId = userData.currentLevelId || undefined;
+    const isBeginnerTrack = (userData.workoutTier ?? "beginner") === "beginner";
+    const currentLevelId = isBeginnerTrack
+      ? "Beginner"
+      : userData.currentLevelId || undefined;
+    const effectiveType = isBeginnerTrack ? "C" : type;
 
     if (idx >= 0) {
       if (!completed) {
@@ -248,15 +265,15 @@ export default function HomeScreen() {
           ...logs[idx],
           completed: true,
           levelCompleted: currentLevelId,
-          workoutType: type,
+          workoutType: effectiveType,
         };
       }
     } else if (completed) {
-      logs.push({ 
-        date: key, 
-        completed: true, 
+      logs.push({
+        date: key,
+        completed: true,
         levelCompleted: currentLevelId,
-        workoutType: type,
+        workoutType: effectiveType,
       });
     }
 
@@ -317,14 +334,24 @@ export default function HomeScreen() {
   if (!user) {
     return (
       <SafeAreaView style={styles.container}>
-        <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: "center" }}>
+        <ScrollView
+          contentContainerStyle={{ flexGrow: 1, justifyContent: "center" }}
+        >
           <View style={styles.card}>
             <Text style={styles.title}>
               {isLoginFlow ? "Welcome Back" : "Create Account"}
             </Text>
             <Text style={styles.subtitle}>Sync with the web app</Text>
             {authError ? (
-              <Text style={{ color: "#ff6b6b", marginBottom: 10, textAlign: "center" }}>{authError}</Text>
+              <Text
+                style={{
+                  color: "#ff6b6b",
+                  marginBottom: 10,
+                  textAlign: "center",
+                }}
+              >
+                {authError}
+              </Text>
             ) : null}
             <TextInput
               style={styles.input}
@@ -343,7 +370,10 @@ export default function HomeScreen() {
               placeholderTextColor="#666"
               secureTextEntry
             />
-            <TouchableOpacity style={styles.primaryActionBtn} onPress={handleAuth}>
+            <TouchableOpacity
+              style={styles.primaryActionBtn}
+              onPress={handleAuth}
+            >
               <Text style={styles.primaryActionBtnText}>
                 {isLoginFlow ? "Sign In" : "Sign Up"}
               </Text>
@@ -352,7 +382,13 @@ export default function HomeScreen() {
               onPress={() => setIsLoginFlow(!isLoginFlow)}
               style={{ marginTop: 20 }}
             >
-              <Text style={{ textAlign: "center", color: "#00E5FF", fontWeight: "600" }}>
+              <Text
+                style={{
+                  textAlign: "center",
+                  color: "#00E5FF",
+                  fontWeight: "600",
+                }}
+              >
                 {isLoginFlow
                   ? "Don't have an account? Sign up"
                   : "Already have an account? Sign in"}
@@ -367,6 +403,7 @@ export default function HomeScreen() {
   // --- 2. AUTHENTICATED BUT NO DATA: Show Onboarding ---
   if (!userData) {
     const accountLabel = user.email || `UID: ${user.uid}`;
+    const isBeginnerTrack = selectedWorkoutTier === "beginner";
 
     return (
       <SafeAreaView style={styles.container}>
@@ -377,6 +414,16 @@ export default function HomeScreen() {
               It&apos;s time to begin your journey. Start with your day 1 stats.
             </Text>
 
+            <View style={styles.attributionBox}>
+              <Text style={styles.attributionTitle}>
+                Inspired by the Busy Dad Program by Busy Dad Training.
+              </Text>
+              <Text style={styles.attributionText}>
+                This app is an independent project and is not affiliated with or
+                endorsed by Busy Dad Training.
+              </Text>
+            </View>
+
             <View style={styles.infoBanner}>
               <Text style={styles.infoBannerText}>
                 Signed in as {accountLabel}
@@ -386,7 +433,9 @@ export default function HomeScreen() {
               </Text>
             </View>
 
-            {syncError ? <Text style={styles.errorText}>{syncError}</Text> : null}
+            {syncError ? (
+              <Text style={styles.errorText}>{syncError}</Text>
+            ) : null}
 
             <Text style={styles.sectionLabel}>Start Date</Text>
             <TextInput
@@ -396,7 +445,7 @@ export default function HomeScreen() {
               placeholder="YYYY-MM-DD"
               placeholderTextColor="#666"
             />
-            
+
             <Text style={styles.sectionLabel}>Starting Weight</Text>
             <TextInput
               style={styles.input}
@@ -407,6 +456,46 @@ export default function HomeScreen() {
               keyboardType="numeric"
             />
 
+            <Text style={styles.sectionLabel}>Workout Type</Text>
+            <View style={styles.tierRow}>
+              {[
+                {
+                  key: "beginner" as const,
+                  label: "Beginner",
+                  description: "Free single-session timer",
+                },
+                {
+                  key: "advanced" as const,
+                  label: "Advanced",
+                  description: "Paid paced rep timer",
+                },
+              ].map((entry) => {
+                const isSelected = selectedWorkoutTier === entry.key;
+                return (
+                  <TouchableOpacity
+                    key={entry.key}
+                    style={[
+                      styles.tierCard,
+                      isSelected && styles.tierCardSelected,
+                    ]}
+                    onPress={() => setSelectedWorkoutTier(entry.key)}
+                  >
+                    <Text
+                      style={[
+                        styles.tierTitle,
+                        isSelected && styles.tierTitleSelected,
+                      ]}
+                    >
+                      {entry.label}
+                    </Text>
+                    <Text style={styles.tierDescription}>
+                      {entry.description}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
             <View style={styles.onboardingPhotoCard}>
               <Text style={styles.sectionLabel}>Day 1 Photo</Text>
               {day1PictureDraft ? (
@@ -416,9 +505,20 @@ export default function HomeScreen() {
                   contentFit="cover"
                 />
               ) : (
-                <View style={[styles.onboardingPreviewImage, { justifyContent: 'center', alignItems: 'center', backgroundColor: '#000' }]}>
+                <View
+                  style={[
+                    styles.onboardingPreviewImage,
+                    {
+                      justifyContent: "center",
+                      alignItems: "center",
+                      backgroundColor: "#000",
+                    },
+                  ]}
+                >
                   <Ionicons name="image-outline" size={48} color="#333" />
-                  <Text style={styles.photoEmptyText}>Upload your starting picture.</Text>
+                  <Text style={styles.photoEmptyText}>
+                    Upload your starting picture.
+                  </Text>
                 </View>
               )}
               <View style={{ marginTop: 10 }}>
@@ -430,56 +530,76 @@ export default function HomeScreen() {
               </View>
             </View>
 
-            <Text style={styles.sectionLabel}>Starting Level</Text>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              style={{ marginBottom: 14 }}
-            >
-              {LEVELS.map((lvl) => {
-                const selected = selectedLevelId === lvl.id;
-                return (
-                  <TouchableOpacity
-                    key={lvl.id}
-                    style={[
-                      styles.levelPill,
-                      selected && styles.levelPillSelected,
-                    ]}
-                    onPress={() => setSelectedLevelId(lvl.id)}
-                  >
-                    <Text
-                      style={[
-                        styles.levelPillText,
-                        selected && styles.levelPillTextSelected,
-                      ]}
-                    >
-                      {lvl.name}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
+            {isBeginnerTrack ? (
+              <View style={styles.beginnerHintBox}>
+                <Text style={styles.beginnerHintText}>
+                  Beginner uses one built-in session, so level selection is
+                  hidden.
+                </Text>
+              </View>
+            ) : (
+              <>
+                <Text style={styles.sectionLabel}>Starting Level</Text>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  style={{ marginBottom: 14 }}
+                >
+                  {LEVELS.map((lvl) => {
+                    const selected = selectedLevelId === lvl.id;
+                    return (
+                      <TouchableOpacity
+                        key={lvl.id}
+                        style={[
+                          styles.levelPill,
+                          selected && styles.levelPillSelected,
+                        ]}
+                        onPress={() => setSelectedLevelId(lvl.id)}
+                      >
+                        <Text
+                          style={[
+                            styles.levelPillText,
+                            selected && styles.levelPillTextSelected,
+                          ]}
+                        >
+                          {lvl.name}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              </>
+            )}
 
-            <TouchableOpacity style={styles.primaryActionBtn} onPress={startProgram}>
+            <TouchableOpacity
+              style={styles.primaryActionBtn}
+              onPress={startProgram}
+            >
               <Text style={styles.primaryActionBtnText}>Start Journey</Text>
             </TouchableOpacity>
 
             <TouchableOpacity style={{ marginTop: 20 }} onPress={handleLogout}>
-              <Text style={{ textAlign: 'center', color: '#888' }}>Sign Out</Text>
+              <Text style={{ textAlign: "center", color: "#888" }}>
+                Sign Out
+              </Text>
             </TouchableOpacity>
           </View>
         </ScrollView>
       </SafeAreaView>
     );
   }
+  const workoutTier = userData.workoutTier ?? "beginner";
+  const isBeginnerTrack = workoutTier === "beginner";
+  const isAdvancedTrack = !isBeginnerTrack;
 
   // --- 3. AUTHENTICATED WITH DATA: Show Dashboard ---
   const startDate = new Date(userData.startDate);
   const daysPassed = Math.max(0, differenceInDays(new Date(), startDate));
   const milestoneDate = addMonths(startDate, 6);
   const daysToMilestone = differenceInDays(milestoneDate, new Date());
-  const isMilestoneReached = isAfter(new Date(), milestoneDate) && !userData.endDate;
-  
+  const isMilestoneReached =
+    isAfter(new Date(), milestoneDate) && !userData.endDate;
+
   const currentLevelObj = userData.currentLevelId
     ? LEVELS.find((l) => l.id === userData.currentLevelId)
     : null;
@@ -489,7 +609,10 @@ export default function HomeScreen() {
   const monthEnd = endOfMonth(monthStart);
   const calendarStart = startOfWeek(monthStart);
   const calendarEnd = endOfWeek(monthEnd);
-  const calendarDays = eachDayOfInterval({ start: calendarStart, end: calendarEnd });
+  const calendarDays = eachDayOfInterval({
+    start: calendarStart,
+    end: calendarEnd,
+  });
 
   const weekDays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -516,8 +639,8 @@ export default function HomeScreen() {
             <Text style={styles.milestoneText}>
               Time to check in and update your progress stats.
             </Text>
-            <TouchableOpacity 
-              style={[styles.primaryActionBtn, { marginTop: 12, height: 40 }]} 
+            <TouchableOpacity
+              style={[styles.primaryActionBtn, { marginTop: 12, height: 40 }]}
               onPress={() => setShowCheckinModal(true)}
             >
               <Text style={styles.primaryActionBtnText}>Complete Check-In</Text>
@@ -527,45 +650,104 @@ export default function HomeScreen() {
 
         {/* Stats Grid */}
         <View style={styles.statsCard}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <Ionicons name="body-outline" size={20} color="#00E5FF" style={{ marginRight: 8 }} />
-              <Text style={{ color: '#fff', fontSize: 18, fontWeight: '700' }}>Overview</Text>
+          <View
+            style={{
+              flexDirection: "row",
+              justifyContent: "space-between",
+              alignItems: "center",
+              marginBottom: 15,
+            }}
+          >
+            <View style={{ flexDirection: "row", alignItems: "center" }}>
+              <Ionicons
+                name="body-outline"
+                size={20}
+                color="#00E5FF"
+                style={{ marginRight: 8 }}
+              />
+              <Text style={{ color: "#fff", fontSize: 18, fontWeight: "700" }}>
+                Overview
+              </Text>
             </View>
-            {currentLevelObj && (
+            {isAdvancedTrack && currentLevelObj && (
               <View style={styles.currentLevelBadge}>
-                <Text style={styles.currentLevelBadgeText}>{currentLevelObj.name}</Text>
+                <Text style={styles.currentLevelBadgeText}>
+                  {currentLevelObj.name}
+                </Text>
               </View>
             )}
           </View>
-          
+
           <View style={styles.statsRow}>
             <View style={styles.statBox}>
               <Text style={styles.statLabel}>Start Date</Text>
-              <Text style={styles.statValue}>{format(startDate, "MMM d, yyyy")}</Text>
+              <Text style={styles.statValue}>
+                {format(startDate, "MMM d, yyyy")}
+              </Text>
             </View>
             <View style={styles.statBox}>
               <Text style={styles.statLabel}>Start Weight</Text>
-              <Text style={styles.statValue}>{userData.startWeight}{' '}<Text style={{ fontSize: 12 }}>kg/lbs</Text></Text>
+              <Text style={styles.statValue}>
+                {userData.startWeight}{" "}
+                <Text style={{ fontSize: 12 }}>kg/lbs</Text>
+              </Text>
             </View>
+          </View>
+
+          <View style={[styles.milestoneCountdown, { marginTop: 15 }]}>
+            <Ionicons
+              name={
+                isBeginnerTrack ? "checkmark-circle-outline" : "flash-outline"
+              }
+              size={16}
+              color="#00E5FF"
+              style={{ marginRight: 6 }}
+            />
+            <Text style={styles.milestoneCountdownText}>
+              {isBeginnerTrack
+                ? "Beginner single-session timer active"
+                : "Advanced paced timer active"}
+            </Text>
           </View>
 
           {!isMilestoneReached && daysToMilestone > 0 && (
             <View style={styles.milestoneCountdown}>
-              <Ionicons name="time-outline" size={16} color="#00E5FF" style={{ marginRight: 6 }} />
-              <Text style={styles.milestoneCountdownText}>{daysToMilestone} days until 6-month check-in</Text>
+              <Ionicons
+                name="time-outline"
+                size={16}
+                color="#00E5FF"
+                style={{ marginRight: 6 }}
+              />
+              <Text style={styles.milestoneCountdownText}>
+                {daysToMilestone} days until 6-month check-in
+              </Text>
             </View>
           )}
 
           {userData.endDate && (
-            <View style={[styles.statsRow, { marginTop: 15, borderTopWidth: 1, borderTopColor: '#222', paddingTop: 15 }]}>
+            <View
+              style={[
+                styles.statsRow,
+                {
+                  marginTop: 15,
+                  borderTopWidth: 1,
+                  borderTopColor: "#222",
+                  paddingTop: 15,
+                },
+              ]}
+            >
               <View style={styles.statBox}>
                 <Text style={styles.statLabel}>Milestone Date</Text>
-                <Text style={styles.statValue}>{format(new Date(userData.endDate), "MMM d, yyyy")}</Text>
+                <Text style={styles.statValue}>
+                  {format(new Date(userData.endDate), "MMM d, yyyy")}
+                </Text>
               </View>
               <View style={styles.statBox}>
                 <Text style={styles.statLabel}>New Weight</Text>
-                <Text style={styles.statValue}>{userData.endWeight}{' '}<Text style={{ fontSize: 12 }}>kg/lbs</Text></Text>
+                <Text style={styles.statValue}>
+                  {userData.endWeight}{" "}
+                  <Text style={{ fontSize: 12 }}>kg/lbs</Text>
+                </Text>
               </View>
             </View>
           )}
@@ -574,14 +756,19 @@ export default function HomeScreen() {
         {/* Workout Timer Section */}
         <View style={{ marginTop: 24 }}>
           <Text style={styles.sectionTitle}>Session Timer</Text>
-          <WorkoutTimer 
+          <WorkoutTimer
+            tier={workoutTier}
             sealsGoal={currentLevelObj?.seals}
             sixCountsGoal={currentLevelObj?.sixCounts}
             onFinish={() => {
               const todayKey = toDateKey(new Date());
-              setSelectedDateForWorkout(todayKey);
-              setWorkoutModalVisible(true);
-            }} 
+              if (isBeginnerTrack) {
+                handleToggleWorkout(todayKey, true, "C");
+              } else {
+                setSelectedDateForWorkout(todayKey);
+                setWorkoutModalVisible(true);
+              }
+            }}
           />
         </View>
 
@@ -590,11 +777,17 @@ export default function HomeScreen() {
           <View style={styles.sectionHeaderRow}>
             <Text style={styles.sectionTitle}>Workout Calendar</Text>
             <View style={styles.calendarNav}>
-              <TouchableOpacity onPress={() => setCurrentMonth(addMonths(currentMonth, -1))}>
+              <TouchableOpacity
+                onPress={() => setCurrentMonth(addMonths(currentMonth, -1))}
+              >
                 <Ionicons name="chevron-back" size={20} color="#fff" />
               </TouchableOpacity>
-              <Text style={styles.calendarMonthName}>{format(currentMonth, "MMMM yyyy")}</Text>
-              <TouchableOpacity onPress={() => setCurrentMonth(addMonths(currentMonth, 1))}>
+              <Text style={styles.calendarMonthName}>
+                {format(currentMonth, "MMMM yyyy")}
+              </Text>
+              <TouchableOpacity
+                onPress={() => setCurrentMonth(addMonths(currentMonth, 1))}
+              >
                 <Ionicons name="chevron-forward" size={20} color="#fff" />
               </TouchableOpacity>
             </View>
@@ -603,8 +796,10 @@ export default function HomeScreen() {
           <View style={styles.calendarGrid}>
             {/* Week Header */}
             <View style={styles.calendarRow}>
-              {weekDays.map(day => (
-                <Text key={day} style={styles.calendarWeekText}>{day}</Text>
+              {weekDays.map((day) => (
+                <Text key={day} style={styles.calendarWeekText}>
+                  {day}
+                </Text>
               ))}
             </View>
 
@@ -615,7 +810,9 @@ export default function HomeScreen() {
                 const isCurrentMonth = isSameMonth(day, currentMonth);
                 const isToday = isSameDay(day, new Date());
                 const dayName = format(day, "EEE");
-                const isWorkoutDay = ["Mon", "Tue", "Thu", "Fri"].includes(dayName);
+                const isWorkoutDay = ["Mon", "Tue", "Thu", "Fri"].includes(
+                  dayName,
+                );
                 const dayLog = getWorkoutLogForDate(dateStr);
                 const isDone = !!dayLog?.completed;
 
@@ -627,12 +824,17 @@ export default function HomeScreen() {
                       !isCurrentMonth && { opacity: 0.2 },
                       isToday && styles.calendarToday,
                       isDone && styles.calendarDayDone,
-                      !isDone && isWorkoutDay && isCurrentMonth && styles.calendarDayActive,
+                      !isDone &&
+                        isWorkoutDay &&
+                        isCurrentMonth &&
+                        styles.calendarDayActive,
                     ]}
                     onPress={() => {
                       if (!isWorkoutDay) return;
                       if (isDone) {
                         handleToggleWorkout(dateStr, false);
+                      } else if (isBeginnerTrack) {
+                        handleToggleWorkout(dateStr, true, "C");
                       } else {
                         setSelectedDateForWorkout(dateStr);
                         setWorkoutModalVisible(true);
@@ -640,12 +842,19 @@ export default function HomeScreen() {
                     }}
                     disabled={!isCurrentMonth && !isWorkoutDay}
                   >
-                    <Text style={[styles.calendarDayNum, isDone && { color: "#fff" }]}>
+                    <Text
+                      style={[
+                        styles.calendarDayNum,
+                        isDone && { color: "#fff" },
+                      ]}
+                    >
                       {format(day, "d")}
                     </Text>
                     {isDone && (
                       <View style={styles.calendarDoneMarker}>
-                        <Text style={styles.calendarDoneType}>{dayLog?.workoutType || 'W'}</Text>
+                        <Text style={styles.calendarDoneType}>
+                          {dayLog?.workoutType || "W"}
+                        </Text>
                       </View>
                     )}
                     {!isDone && isWorkoutDay && isCurrentMonth && (
@@ -656,23 +865,33 @@ export default function HomeScreen() {
               })}
             </View>
           </View>
-          <Text style={styles.calendarLegend}>Scheduled days: Mon, Tue, Thu, Fri</Text>
+          <Text style={styles.calendarLegend}>
+            Scheduled days: Mon, Tue, Thu, Fri
+          </Text>
         </View>
 
         {/* Video Tutorials */}
         <View style={{ marginTop: 30 }}>
           <Text style={styles.sectionTitle}>Tutorials & Intro</Text>
           <View style={styles.videoRow}>
-            <TouchableOpacity 
-              style={styles.videoCard} 
-              onPress={() => Linking.openURL('https://www.youtube.com/watch?v=3Yooen5zgCg&list=PLhE7BYqSXmSEuE2qoJE9w3rLEzuenuoLq&index=1')}
+            <TouchableOpacity
+              style={styles.videoCard}
+              onPress={() =>
+                Linking.openURL(
+                  "https://www.youtube.com/watch?v=3Yooen5zgCg&list=PLhE7BYqSXmSEuE2qoJE9w3rLEzuenuoLq&index=1",
+                )
+              }
             >
               <Ionicons name="play-circle" size={32} color="#FF3366" />
               <Text style={styles.videoCardText}>Program Intro</Text>
             </TouchableOpacity>
-            <TouchableOpacity 
-              style={styles.videoCard} 
-              onPress={() => Linking.openURL('https://www.youtube.com/playlist?list=PLhE7BYqSXmSEJFzla9_j34HEmLdEsOrvF')}
+            <TouchableOpacity
+              style={styles.videoCard}
+              onPress={() =>
+                Linking.openURL(
+                  "https://www.youtube.com/playlist?list=PLhE7BYqSXmSEJFzla9_j34HEmLdEsOrvF",
+                )
+              }
             >
               <Ionicons name="videocam" size={32} color="#00E5FF" />
               <Text style={styles.videoCardText}>Forms & Levels</Text>
@@ -681,7 +900,9 @@ export default function HomeScreen() {
         </View>
 
         {/* Progress Photos */}
-        <Text style={[styles.sectionTitle, { marginTop: 30 }]}>Progress Photos</Text>
+        <Text style={[styles.sectionTitle, { marginTop: 30 }]}>
+          Progress Photos
+        </Text>
         <View style={styles.photosGrid}>
           <View style={styles.photoCard}>
             <Text style={styles.photoCardTitle}>Day 1</Text>
@@ -692,18 +913,28 @@ export default function HomeScreen() {
                 contentFit="cover"
               />
             ) : (
-              <View style={[styles.progressImage, { justifyContent: 'center', alignItems: 'center' }]}>
+              <View
+                style={[
+                  styles.progressImage,
+                  { justifyContent: "center", alignItems: "center" },
+                ]}
+              >
                 <Ionicons name="camera-outline" size={40} color="#333" />
                 <Text style={styles.photoEmptyText}>No photo yet</Text>
               </View>
             )}
-            <TouchableOpacity style={[styles.secondaryActionBtn, { marginTop: 10 }]} onPress={replaceDay1Picture}>
-               <Text style={styles.secondaryActionBtnText}>Replace Photo</Text>
+            <TouchableOpacity
+              style={[styles.secondaryActionBtn, { marginTop: 10 }]}
+              onPress={replaceDay1Picture}
+            >
+              <Text style={styles.secondaryActionBtnText}>Replace Photo</Text>
             </TouchableOpacity>
           </View>
-          
+
           <View style={styles.photoCard}>
-            <Text style={[styles.photoCardTitle, { color: "#00E5FF" }]}>6-Month Check-in</Text>
+            <Text style={[styles.photoCardTitle, { color: "#00E5FF" }]}>
+              6-Month Check-in
+            </Text>
             {userData.endPictureUrl ? (
               <Image
                 source={{ uri: userData.endPictureUrl }}
@@ -711,118 +942,190 @@ export default function HomeScreen() {
                 contentFit="cover"
               />
             ) : (
-              <View style={[styles.progressImage, { justifyContent: 'center', alignItems: 'center' }]}>
+              <View
+                style={[
+                  styles.progressImage,
+                  { justifyContent: "center", alignItems: "center" },
+                ]}
+              >
                 <Ionicons name="lock-closed-outline" size={40} color="#222" />
-                <Text style={[styles.photoEmptyText, { textAlign: 'center', padding: 10 }]}>Unlock after check-in</Text>
+                <Text
+                  style={[
+                    styles.photoEmptyText,
+                    { textAlign: "center", padding: 10 },
+                  ]}
+                >
+                  Unlock after check-in
+                </Text>
               </View>
             )}
           </View>
         </View>
 
-        {/* Levels Section */}
-        <Text style={[styles.sectionTitle, { marginTop: 30 }]}>My Level</Text>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={{ marginBottom: 12 }}
-        >
-          {LEVELS.map((lvl) => {
-            const isCurrent = userData.currentLevelId === lvl.id;
-            return (
-              <TouchableOpacity
-                key={`level-select-${lvl.id}`}
-                style={[
-                  styles.levelPill,
-                  isCurrent && styles.levelPillSelected,
-                ]}
-                onPress={() => updateLevel(lvl.id)}
-              >
-                <Text
-                  style={[
-                    styles.levelPillText,
-                    isCurrent && styles.levelPillTextSelected,
-                  ]}
-                >
-                  {lvl.name}
+        {isAdvancedTrack && (
+          <>
+            <Text style={[styles.sectionTitle, { marginTop: 30 }]}>
+              My Level
+            </Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={{ marginBottom: 12 }}
+            >
+              {LEVELS.map((lvl) => {
+                const isCurrent = userData.currentLevelId === lvl.id;
+                return (
+                  <TouchableOpacity
+                    key={`level-select-${lvl.id}`}
+                    style={[
+                      styles.levelPill,
+                      isCurrent && styles.levelPillSelected,
+                    ]}
+                    onPress={() => updateLevel(lvl.id)}
+                  >
+                    <Text
+                      style={[
+                        styles.levelPillText,
+                        isCurrent && styles.levelPillTextSelected,
+                      ]}
+                    >
+                      {lvl.name}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+            {currentLevelObj && (
+              <View style={styles.levelCard}>
+                <Text style={styles.levelTitle}>
+                  {currentLevelObj.name} (Active)
                 </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
-        {currentLevelObj && (
-          <View style={styles.levelCard}>
-            <Text style={styles.levelTitle}>{currentLevelObj.name} (Active)</Text>
-            <Text style={styles.levelDesc}>{currentLevelObj.description}</Text>
-          </View>
+                <Text style={styles.levelDesc}>
+                  {currentLevelObj.description}
+                </Text>
+              </View>
+            )}
+          </>
         )}
 
-        <TouchableOpacity style={[styles.secondaryActionBtn, { marginTop: 40, marginBottom: 60 }]} onPress={handleLogout}>
-          <Text style={[styles.secondaryActionBtnText, { color: '#888' }]}>Sign Out</Text>
+        <TouchableOpacity
+          style={[
+            styles.secondaryActionBtn,
+            { marginTop: 40, marginBottom: 60 },
+          ]}
+          onPress={handleLogout}
+        >
+          <Text style={[styles.secondaryActionBtnText, { color: "#888" }]}>
+            Sign Out
+          </Text>
         </TouchableOpacity>
       </ScrollView>
 
-      {/* Workout Type Selector Modal */}
-      <Modal
-        visible={workoutModalVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setWorkoutModalVisible(false)}
-      >
-        <TouchableOpacity 
-          style={styles.modalBackdrop} 
-          activeOpacity={1} 
-          onPress={() => setWorkoutModalVisible(false)}
+      {isAdvancedTrack && (
+        <Modal
+          visible={workoutModalVisible}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setWorkoutModalVisible(false)}
         >
-          <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>Workout Type</Text>
-            <Text style={styles.modalSubtitle}>How did you move today?</Text>
-            
-            <TouchableOpacity 
-              style={styles.workoutOptionBtn}
-              onPress={() => {
-                if (selectedDateForWorkout) handleToggleWorkout(selectedDateForWorkout, true, 'N');
-                setWorkoutModalVisible(false);
-              }}
-            >
-              <View style={[styles.optionIconBox, { backgroundColor: 'rgba(255, 51, 102, 0.1)' }]}>
-                <Text style={{ color: '#FF3366', fontWeight: '900', fontSize: 18 }}>N</Text>
-              </View>
-              <View>
-                <Text style={styles.optionTitle}>Navy Seals</Text>
-                <Text style={styles.optionDesc}>Full range burpees</Text>
-              </View>
-            </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.modalBackdrop}
+            activeOpacity={1}
+            onPress={() => setWorkoutModalVisible(false)}
+          >
+            <View style={styles.modalCard}>
+              <Text style={styles.modalTitle}>Workout Type</Text>
+              <Text style={styles.modalSubtitle}>How did you move today?</Text>
 
-            <TouchableOpacity 
-              style={styles.workoutOptionBtn}
-              onPress={() => {
-                if (selectedDateForWorkout) handleToggleWorkout(selectedDateForWorkout, true, 'C');
-                setWorkoutModalVisible(false);
-              }}
-            >
-              <View style={[styles.optionIconBox, { backgroundColor: 'rgba(0, 229, 255, 0.1)' }]}>
-                <Text style={{ color: '#00E5FF', fontWeight: '900', fontSize: 18 }}>C</Text>
-              </View>
-              <View>
-                <Text style={styles.optionTitle}>6-Counts</Text>
-                <Text style={styles.optionDesc}>Strict 6-count burpees</Text>
-              </View>
-            </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.workoutOptionBtn}
+                onPress={() => {
+                  if (selectedDateForWorkout)
+                    handleToggleWorkout(selectedDateForWorkout, true, "N");
+                  setWorkoutModalVisible(false);
+                }}
+              >
+                <View
+                  style={[
+                    styles.optionIconBox,
+                    { backgroundColor: "rgba(255, 51, 102, 0.1)" },
+                  ]}
+                >
+                  <Text
+                    style={{
+                      color: "#FF3366",
+                      fontWeight: "900",
+                      fontSize: 18,
+                    }}
+                  >
+                    N
+                  </Text>
+                </View>
+                <View>
+                  <Text style={styles.optionTitle}>Navy Seals</Text>
+                  <Text style={styles.optionDesc}>Full range burpees</Text>
+                </View>
+              </TouchableOpacity>
 
-            <TouchableOpacity 
-              style={[styles.modalSecondaryBtn, { marginTop: 10, alignSelf: 'center', borderWeight: 0, paddingHorizontal: 30 }]} 
-              onPress={() => setWorkoutModalVisible(false)}
-            >
-              <Text style={styles.modalSecondaryBtnText}>Cancel</Text>
-            </TouchableOpacity>
-          </View>
-        </TouchableOpacity>
-      </Modal>
+              <TouchableOpacity
+                style={styles.workoutOptionBtn}
+                onPress={() => {
+                  if (selectedDateForWorkout)
+                    handleToggleWorkout(selectedDateForWorkout, true, "C");
+                  setWorkoutModalVisible(false);
+                }}
+              >
+                <View
+                  style={[
+                    styles.optionIconBox,
+                    { backgroundColor: "rgba(0, 229, 255, 0.1)" },
+                  ]}
+                >
+                  <Text
+                    style={{
+                      color: "#00E5FF",
+                      fontWeight: "900",
+                      fontSize: 18,
+                    }}
+                  >
+                    C
+                  </Text>
+                </View>
+                <View>
+                  <Text style={styles.optionTitle}>6-Counts</Text>
+                  <Text style={styles.optionDesc}>Strict 6-count burpees</Text>
+                </View>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.modalSecondaryBtn,
+                  {
+                    marginTop: 10,
+                    alignSelf: "center",
+                    borderWidth: 0,
+                    paddingHorizontal: 30,
+                  },
+                ]}
+                onPress={() => setWorkoutModalVisible(false)}
+              >
+                <Text style={styles.modalSecondaryBtnText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </Modal>
+      )}
 
       {/* Milestone Checkin Modal */}
       <Modal visible={showCheckinModal} animationType="slide" transparent>
         <View style={styles.modalBackdrop}>
-          <ScrollView contentContainerStyle={{ justifyContent: 'center', flexGrow: 1, padding: 20 }}>
+          <ScrollView
+            contentContainerStyle={{
+              justifyContent: "center",
+              flexGrow: 1,
+              padding: 20,
+            }}
+          >
             <View style={styles.modalCard}>
               <Text style={styles.modalTitle}>6-Month Check-In</Text>
               <Text style={styles.modalSubtitle}>
@@ -848,7 +1151,16 @@ export default function HomeScreen() {
                     contentFit="cover"
                   />
                 ) : (
-                  <View style={[styles.onboardingPreviewImage, { justifyContent: 'center', alignItems: 'center', backgroundColor: '#000' }]}>
+                  <View
+                    style={[
+                      styles.onboardingPreviewImage,
+                      {
+                        justifyContent: "center",
+                        alignItems: "center",
+                        backgroundColor: "#000",
+                      },
+                    ]}
+                  >
                     <Ionicons name="camera" size={32} color="#333" />
                   </View>
                 )}
@@ -921,7 +1233,13 @@ const styles = StyleSheet.create({
     borderColor: "#222",
     borderWidth: 1,
   },
-  sectionLabel: { color: "#666", marginBottom: 8, fontWeight: "600", fontSize: 13, textTransform: 'uppercase' },
+  sectionLabel: {
+    color: "#666",
+    marginBottom: 8,
+    fontWeight: "600",
+    fontSize: 13,
+    textTransform: "uppercase",
+  },
   infoBanner: {
     backgroundColor: "rgba(255,255,255,0.03)",
     borderColor: "#222",
@@ -932,7 +1250,7 @@ const styles = StyleSheet.create({
   },
   infoBannerText: { color: "#fff", fontWeight: "600" },
   infoBannerTextMuted: { color: "#666", marginTop: 4, fontSize: 12 },
-  errorText: { color: "#ff6b6b", marginBottom: 10, textAlign: 'center' },
+  errorText: { color: "#ff6b6b", marginBottom: 10, textAlign: "center" },
   header: { fontSize: 32, fontWeight: "900", color: "#fff", letterSpacing: -1 },
   desc: { fontSize: 16, color: "#666", marginBottom: 10 },
   headerRow: {
@@ -947,7 +1265,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 10,
-    backgroundColor: '#111'
+    backgroundColor: "#111",
   },
   logoutText: { color: "#888", fontWeight: "700", fontSize: 13 },
   milestoneCard: {
@@ -971,175 +1289,175 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     borderColor: "#222",
     borderWidth: 1,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.3,
     shadowRadius: 20,
   },
   currentLevelBadge: {
-    backgroundColor: 'rgba(255, 51, 102, 0.1)',
+    backgroundColor: "rgba(255, 51, 102, 0.1)",
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 10,
-    borderColor: 'rgba(255, 51, 102, 0.3)',
-    borderWidth: 1
+    borderColor: "rgba(255, 51, 102, 0.3)",
+    borderWidth: 1,
   },
   currentLevelBadgeText: {
-    color: '#FF3366',
-    fontWeight: '800',
-    fontSize: 12
+    color: "#FF3366",
+    fontWeight: "800",
+    fontSize: 12,
   },
   statsRow: {
-    flexDirection: 'row',
+    flexDirection: "row",
   },
   statBox: {
-    flex: 1
+    flex: 1,
   },
   statLabel: {
-    color: '#555',
+    color: "#555",
     fontSize: 12,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    marginBottom: 4
+    fontWeight: "700",
+    textTransform: "uppercase",
+    marginBottom: 4,
   },
   statValue: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 20,
-    fontWeight: '900'
+    fontWeight: "900",
   },
   milestoneCountdown: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 229, 255, 0.05)',
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(0, 229, 255, 0.05)",
     padding: 10,
     borderRadius: 12,
-    marginTop: 15
+    marginTop: 15,
   },
   milestoneCountdownText: {
-    color: '#00E5FF',
+    color: "#00E5FF",
     fontSize: 13,
-    fontWeight: '600'
+    fontWeight: "600",
   },
   sectionHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 16,
   },
   sectionTitle: {
     fontSize: 20,
-    fontWeight: '900',
-    color: '#fff'
+    fontWeight: "900",
+    color: "#fff",
   },
   calendarNav: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
   },
   calendarMonthName: {
-    color: '#fff',
-    fontWeight: '700',
+    color: "#fff",
+    fontWeight: "700",
     fontSize: 14,
     minWidth: 100,
-    textAlign: 'center'
+    textAlign: "center",
   },
   calendarGrid: {
-    backgroundColor: '#111',
+    backgroundColor: "#111",
     borderRadius: 20,
     padding: 12,
-    borderColor: '#222',
-    borderWidth: 1
+    borderColor: "#222",
+    borderWidth: 1,
   },
   calendarRow: {
-    flexDirection: 'row',
-    marginBottom: 8
+    flexDirection: "row",
+    marginBottom: 8,
   },
   calendarWeekText: {
     flex: 1,
-    textAlign: 'center',
-    color: '#555',
+    textAlign: "center",
+    color: "#555",
     fontSize: 12,
-    fontWeight: '700'
+    fontWeight: "700",
   },
   calendarDaysContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap'
+    flexDirection: "row",
+    flexWrap: "wrap",
   },
   calendarDay: {
-    width: '14.28%',
+    width: "14.28%",
     aspectRatio: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     borderRadius: 10,
     marginBottom: 4,
-    position: 'relative'
+    position: "relative",
   },
   calendarToday: {
-    backgroundColor: 'rgba(255,255,255,0.05)'
+    backgroundColor: "rgba(255,255,255,0.05)",
   },
   calendarDayActive: {
-    borderColor: '#333',
-    borderWidth: 1
+    borderColor: "#333",
+    borderWidth: 1,
   },
   calendarDayDone: {
-    backgroundColor: 'rgba(0, 229, 255, 0.1)',
-    borderColor: '#00E5FF',
-    borderWidth: 1
+    backgroundColor: "rgba(0, 229, 255, 0.1)",
+    borderColor: "#00E5FF",
+    borderWidth: 1,
   },
   calendarDayNum: {
-    color: '#666',
-    fontWeight: '700',
-    fontSize: 14
+    color: "#666",
+    fontWeight: "700",
+    fontSize: 14,
   },
   calendarDoneMarker: {
-    position: 'absolute',
+    position: "absolute",
     bottom: 2,
-    backgroundColor: '#00E5FF',
+    backgroundColor: "#00E5FF",
     paddingHorizontal: 4,
-    borderRadius: 4
+    borderRadius: 4,
   },
   calendarDoneType: {
-    color: '#000',
+    color: "#000",
     fontSize: 8,
-    fontWeight: '900'
+    fontWeight: "900",
   },
   calendarRestMarker: {
     width: 4,
     height: 4,
     borderRadius: 2,
-    backgroundColor: '#333',
-    marginTop: 2
+    backgroundColor: "#333",
+    marginTop: 2,
   },
   calendarLegend: {
-    color: '#555',
+    color: "#555",
     fontSize: 11,
     marginTop: 10,
-    textAlign: 'center'
+    textAlign: "center",
   },
   videoRow: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 12,
-    marginTop: 12
+    marginTop: 12,
   },
   videoCard: {
     flex: 1,
-    backgroundColor: '#111',
+    backgroundColor: "#111",
     borderRadius: 20,
     padding: 20,
-    alignItems: 'center',
-    borderColor: '#222',
-    borderWidth: 1
+    alignItems: "center",
+    borderColor: "#222",
+    borderWidth: 1,
   },
   videoCardText: {
-    color: '#fff',
-    fontWeight: '700',
+    color: "#fff",
+    fontWeight: "700",
     marginTop: 8,
-    fontSize: 13
+    fontSize: 13,
   },
   photosGrid: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 12,
-    marginTop: 12
+    marginTop: 12,
   },
   photoCard: {
     flex: 1,
@@ -1172,12 +1490,76 @@ const styles = StyleSheet.create({
     padding: 12,
     marginBottom: 20,
   },
+  attributionBox: {
+    backgroundColor: "rgba(255,255,255,0.04)",
+    borderColor: "#222",
+    borderWidth: 1,
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 18,
+  },
+  attributionTitle: {
+    color: "#fff",
+    fontWeight: "800",
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  attributionText: {
+    color: "#888",
+    fontSize: 12,
+    lineHeight: 18,
+    marginTop: 6,
+  },
   onboardingPreviewImage: {
     width: "100%",
     height: 160,
     borderRadius: 12,
     borderColor: "#222",
     borderWidth: 1,
+  },
+  tierRow: {
+    flexDirection: "row",
+    gap: 12,
+    marginBottom: 20,
+  },
+  tierCard: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: "#222",
+    borderRadius: 16,
+    padding: 14,
+    backgroundColor: "#111",
+  },
+  tierCardSelected: {
+    borderColor: "#00E5FF",
+    backgroundColor: "rgba(0, 229, 255, 0.08)",
+  },
+  tierTitle: {
+    color: "#fff",
+    fontWeight: "800",
+    fontSize: 16,
+    marginBottom: 4,
+  },
+  tierTitleSelected: {
+    color: "#00E5FF",
+  },
+  tierDescription: {
+    color: "#888",
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  beginnerHintBox: {
+    backgroundColor: "rgba(0, 229, 255, 0.08)",
+    borderColor: "#1d4d4d",
+    borderWidth: 1,
+    borderRadius: 16,
+    padding: 12,
+    marginBottom: 16,
+  },
+  beginnerHintText: {
+    color: "#c6f7ff",
+    fontSize: 13,
+    lineHeight: 20,
   },
   levelPill: {
     borderWidth: 1,
@@ -1210,34 +1592,34 @@ const styles = StyleSheet.create({
   },
   levelDesc: { color: "#888", fontSize: 14, lineHeight: 20 },
   primaryActionBtn: {
-    backgroundColor: '#FF3366',
+    backgroundColor: "#FF3366",
     height: 56,
     borderRadius: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#FF3366',
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: "#FF3366",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.4,
     shadowRadius: 10,
   },
   primaryActionBtnText: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 16,
-    fontWeight: '900'
+    fontWeight: "900",
   },
   secondaryActionBtn: {
-    borderColor: '#222',
+    borderColor: "#222",
     borderWidth: 1,
-    backgroundColor: '#111',
+    backgroundColor: "#111",
     height: 50,
     borderRadius: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   secondaryActionBtnText: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 14,
-    fontWeight: '700'
+    fontWeight: "700",
   },
   modalBackdrop: {
     flex: 1,
@@ -1257,9 +1639,9 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: "900",
     marginBottom: 8,
-    textAlign: 'center'
+    textAlign: "center",
   },
-  modalSubtitle: { color: "#888", marginBottom: 24, textAlign: 'center' },
+  modalSubtitle: { color: "#888", marginBottom: 24, textAlign: "center" },
   modalActions: {
     flexDirection: "row",
     gap: 12,
@@ -1271,7 +1653,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 16,
     paddingVertical: 14,
-    alignItems: 'center'
+    alignItems: "center",
   },
   modalSecondaryBtnText: { color: "#888", fontWeight: "700" },
   modalPrimaryBtn: {
@@ -1279,34 +1661,34 @@ const styles = StyleSheet.create({
     backgroundColor: "#FF3366",
     borderRadius: 16,
     paddingVertical: 14,
-    alignItems: 'center'
+    alignItems: "center",
   },
   modalPrimaryBtnText: { color: "#fff", fontWeight: "800" },
   workoutOptionBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#0a0a0a',
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#0a0a0a",
     padding: 16,
     borderRadius: 20,
     marginBottom: 12,
-    borderColor: '#222',
-    borderWidth: 1
+    borderColor: "#222",
+    borderWidth: 1,
   },
   optionIconBox: {
     width: 48,
     height: 48,
     borderRadius: 14,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 16
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 16,
   },
   optionTitle: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 17,
-    fontWeight: '800'
+    fontWeight: "800",
   },
   optionDesc: {
-    color: '#666',
-    fontSize: 13
-  }
+    color: "#666",
+    fontSize: 13,
+  },
 });

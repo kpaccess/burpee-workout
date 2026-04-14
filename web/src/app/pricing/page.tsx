@@ -32,17 +32,20 @@ const PRO_FEATURES = [
   "Priority support",
 ];
 
+const BEGINNER_FEATURES = [
+  "Beginner workout track",
+  "Free access with no billing",
+  "Placeholder video area for your future content",
+  "Core progress tracking",
+];
+
 export default function PricingPage() {
   const { user } = useAuth();
   const { isPro, isTrialing, trialEndsAt, stripeCustomerId, loading } =
-    useSubscription(
-      user?.uid ?? null,
-      user?.email,
-    );
+    useSubscription(user?.uid ?? null, user?.email);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const [portalError, setPortalError] = useState<string | null>(null);
   const isPaidSubscriber = isPro && !isTrialing;
-  const canStartTrial = Boolean(user) && !isPro && !trialEndsAt;
   const formattedTrialEnd = trialEndsAt
     ? new Date(trialEndsAt).toLocaleDateString()
     : null;
@@ -50,11 +53,6 @@ export default function PricingPage() {
   const [portalLoading, setPortalLoading] = useState(false);
   const router = useRouter();
   const handleUpgrade = async () => {
-    if (canStartTrial) {
-      router.push("/");
-      return;
-    }
-
     if (!user) {
       router.push("/login?next=/pricing");
       return;
@@ -140,15 +138,92 @@ export default function PricingPage() {
               mb: 1,
             }}
           >
-            BurpeePacer Pro
+            Workout Tracks
           </Typography>
           <Typography variant="h6" color="grey.400">
-            Unlock the full program. Track every rep. Crush every milestone.
+            Beginner is completely free. Only the advanced track has charges.
           </Typography>
         </Box>
 
-        {/* Pro Plan — single centered card */}
-        <Box sx={{ display: "flex", justifyContent: "center" }}>
+        <Box
+          sx={{
+            display: "grid",
+            gridTemplateColumns: { xs: "1fr", md: "repeat(2, minmax(0, 1fr))" },
+            gap: 3,
+            alignItems: "start",
+          }}
+        >
+          <Card
+            sx={{
+              borderRadius: 3,
+              background: "rgba(0,229,255,0.08)",
+              border: "1px solid rgba(0,229,255,0.35)",
+              backdropFilter: "blur(10px)",
+              width: "100%",
+            }}
+          >
+            <CardContent sx={{ p: 4 }}>
+              <Chip
+                label="BEGINNER"
+                size="small"
+                sx={{
+                  mb: 2,
+                  background: "rgba(0,229,255,0.18)",
+                  color: "white",
+                  fontWeight: 700,
+                }}
+              />
+              <Box
+                sx={{
+                  display: "flex",
+                  alignItems: "baseline",
+                  gap: 0.5,
+                  mb: 0.5,
+                }}
+              >
+                <Typography variant="h3" fontWeight={800} color="white">
+                  Free
+                </Typography>
+              </Box>
+              <Typography variant="body2" color="grey.400" sx={{ mb: 3 }}>
+                No charges now or later
+              </Typography>
+              <Divider sx={{ borderColor: "rgba(255,255,255,0.1)", mb: 3 }} />
+              <List dense disablePadding>
+                {BEGINNER_FEATURES.map((feature) => (
+                  <ListItem key={feature} disablePadding sx={{ mb: 1.5 }}>
+                    <ListItemIcon sx={{ minWidth: 36 }}>
+                      <CheckCircleIcon
+                        sx={{ color: "#00E5FF", fontSize: 20 }}
+                      />
+                    </ListItemIcon>
+                    <ListItemText
+                      primary={feature}
+                      primaryTypographyProps={{ color: "white", fontSize: 15 }}
+                    />
+                  </ListItem>
+                ))}
+              </List>
+              <Button
+                fullWidth
+                variant="outlined"
+                size="large"
+                onClick={() => router.push(user ? "/" : "/login")}
+                sx={{
+                  mt: 3,
+                  py: 1.5,
+                  fontWeight: 700,
+                  fontSize: 15,
+                  borderRadius: 2,
+                  color: "white",
+                  borderColor: "rgba(0,229,255,0.4)",
+                }}
+              >
+                {user ? "Use Beginner Track" : "Sign in for Beginner"}
+              </Button>
+            </CardContent>
+          </Card>
+
           <Card
             sx={{
               borderRadius: 3,
@@ -159,12 +234,10 @@ export default function PricingPage() {
               position: "relative",
               overflow: "visible",
               width: "100%",
-              maxWidth: 480,
             }}
           >
-            {/* Pro badge */}
             <Chip
-              label="PRO"
+              label="ADVANCED"
               size="small"
               icon={
                 <WorkspacePremiumIcon sx={{ fontSize: "14px !important" }} />
@@ -199,7 +272,7 @@ export default function PricingPage() {
                 </Typography>
               </Box>
               <Typography variant="body2" color="grey.500" sx={{ mb: 3 }}>
-                Cancel anytime
+                Paid subscription
               </Typography>
               <Divider sx={{ borderColor: "rgba(255,255,255,0.1)", mb: 3 }} />
               <List dense disablePadding>
@@ -228,7 +301,9 @@ export default function PricingPage() {
               ) : isPro ? (
                 <Box sx={{ mt: 3 }}>
                   <Chip
-                    label={isTrialing ? "✓ 30-day free trial active" : "✓ You're on Pro"}
+                    label={
+                      isTrialing ? "✓ Trial active" : "✓ Advanced unlocked"
+                    }
                     sx={{
                       width: "100%",
                       background: "linear-gradient(135deg, #f59e0b, #ef4444)",
@@ -255,9 +330,13 @@ export default function PricingPage() {
                       variant="outlined"
                       onClick={handleUpgrade}
                       disabled={checkoutLoading}
-                      sx={{ mt: 1.5, borderColor: "rgba(255,255,255,0.25)", color: "white" }}
+                      sx={{
+                        mt: 1.5,
+                        borderColor: "rgba(255,255,255,0.25)",
+                        color: "white",
+                      }}
                     >
-                      {checkoutLoading ? "Redirecting..." : "Upgrade now"}
+                      {checkoutLoading ? "Redirecting..." : "Subscribe now"}
                     </Button>
                   )}
 
@@ -310,11 +389,9 @@ export default function PricingPage() {
                 >
                   {checkoutLoading
                     ? "Redirecting..."
-                    : canStartTrial
-                      ? "Start 30-day free trial"
                     : user
-                      ? "Upgrade to Pro"
-                      : "Sign in to start free trial"}
+                      ? "Unlock Advanced"
+                      : "Sign in to unlock Advanced"}
                 </Button>
               )}
               {checkoutError && (
@@ -369,8 +446,8 @@ export default function PricingPage() {
         >
           <LockIcon sx={{ color: "grey.600", fontSize: 18 }} />
           <Typography variant="body2" color="grey.500">
-            Features marked with a lock icon in the app require a Pro
-            subscription. Your data is always yours — even if you cancel.
+            Beginner access remains free. Only advanced features and premium
+            content require a paid subscription.
           </Typography>
         </Box>
       </Container>

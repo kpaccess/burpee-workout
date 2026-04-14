@@ -17,7 +17,7 @@ import {
 import PhotoCamera from "@mui/icons-material/PhotoCamera";
 import { motion } from "framer-motion";
 import Image from "next/image";
-import { LEVELS } from "../types";
+import { LEVELS, WorkoutTier } from "../types";
 import { useAuth } from "../context/AuthContext";
 
 interface OnboardingProps {
@@ -26,7 +26,7 @@ interface OnboardingProps {
     startWeight: number;
     startPictureUrl: string | null;
     currentLevelId: string;
-    trialEndsAt: string;
+    workoutTier: WorkoutTier;
   }) => void;
 }
 
@@ -38,6 +38,8 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
   const [weight, setWeight] = useState("");
   const [pictureUrl, setPictureUrl] = useState<string | null>(null);
   const [level, setLevel] = useState("1B");
+  const [workoutTier, setWorkoutTier] = useState<WorkoutTier>("beginner");
+  const isBeginnerTrack = workoutTier === "beginner";
 
   const accountLabel =
     user?.email || (user ? `UID: ${user.uid}` : "Unknown account");
@@ -57,17 +59,12 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
     e.preventDefault();
     if (!weight) return;
 
-    // 30-day free plan for all users, starting from their chosen start date.
-    const start = new Date(`${startDate}T00:00:00`);
-    const trialEnds = new Date(start);
-    trialEnds.setDate(trialEnds.getDate() + 30);
-
     onComplete({
       startDate,
       startWeight: parseFloat(weight),
       startPictureUrl: pictureUrl,
-      currentLevelId: level,
-      trialEndsAt: trialEnds.toISOString(),
+      currentLevelId: isBeginnerTrack ? "1B" : level,
+      workoutTier,
     });
   };
 
@@ -138,6 +135,15 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
           </Button>
         </Alert>
 
+        <Alert
+          severity={workoutTier === "beginner" ? "success" : "info"}
+          sx={{ mb: 3 }}
+        >
+          {workoutTier === "beginner"
+            ? "Beginner is completely free. No billing is required for this track."
+            : "Advanced is the paid track. You can subscribe after setup to unlock it."}
+        </Alert>
+
         <form onSubmit={handleSubmit}>
           <Stack spacing={3}>
             <TextField
@@ -160,20 +166,44 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
             />
 
             <FormControl fullWidth required>
-              <InputLabel id="level-label">Starting Level</InputLabel>
+              <InputLabel id="workout-tier-label">Workout Type</InputLabel>
               <Select
-                labelId="level-label"
-                value={level}
-                label="Starting Level"
-                onChange={(e) => setLevel(e.target.value)}
+                labelId="workout-tier-label"
+                value={workoutTier}
+                label="Workout Type"
+                onChange={(e) => setWorkoutTier(e.target.value as WorkoutTier)}
               >
-                {LEVELS.map((lvl) => (
-                  <MenuItem key={lvl.id} value={lvl.id}>
-                    {lvl.name} - {lvl.description}
-                  </MenuItem>
-                ))}
+                <MenuItem value="beginner">
+                  Beginner - free track with starter guidance
+                </MenuItem>
+                <MenuItem value="advanced">
+                  Advanced - paid track with premium workouts
+                </MenuItem>
               </Select>
             </FormControl>
+
+            {!isBeginnerTrack ? (
+              <FormControl fullWidth required>
+                <InputLabel id="level-label">Starting Level</InputLabel>
+                <Select
+                  labelId="level-label"
+                  value={level}
+                  label="Starting Level"
+                  onChange={(e) => setLevel(e.target.value)}
+                >
+                  {LEVELS.map((lvl) => (
+                    <MenuItem key={lvl.id} value={lvl.id}>
+                      {lvl.name} - {lvl.description}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            ) : (
+              <Alert severity="info">
+                Beginner uses one built-in workout option, so there is no level
+                selection here.
+              </Alert>
+            )}
 
             <Box
               sx={{
@@ -229,7 +259,9 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
               size="large"
               sx={{ mt: 2, py: 1.5, fontSize: "1.1rem" }}
             >
-              Start the Program
+              {workoutTier === "beginner"
+                ? "Start Beginner Program"
+                : "Continue to Advanced Program"}
             </Button>
           </Stack>
         </form>

@@ -8,7 +8,6 @@ import {
   Grid,
   Chip,
   Button,
-  IconButton,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -34,19 +33,26 @@ import {
   eachDayOfInterval,
   startOfWeek,
   endOfWeek,
-  isSameMonth
+  isSameMonth,
 } from "date-fns";
 import VideocamIcon from "@mui/icons-material/Videocam";
 import LocalFireDepartmentIcon from "@mui/icons-material/LocalFireDepartment";
 import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
 import { useAuth } from "../context/AuthContext";
 import { toDateKey } from "../lib/date";
+import { useSubscription } from "../hooks/useSubscription";
+import { useRouter } from "next/navigation";
+import WorkoutTimer from "./WorkoutTimer";
 
 interface DashboardProps {
   userData: UserData;
   onClear: () => void;
   onMilestoneCheckin: () => void;
-  onToggleWorkout?: (dateStr: string, completed: boolean, type?: 'N' | 'C') => void;
+  onToggleWorkout?: (
+    dateStr: string,
+    completed: boolean,
+    type?: "N" | "C",
+  ) => void;
   onUpdateData?: (data: Partial<UserData>) => void;
   syncError?: string | null;
 }
@@ -59,11 +65,19 @@ export default function Dashboard({
   onUpdateData,
   syncError,
 }: DashboardProps) {
-  const { logout } = useAuth();
+  const { user, logout } = useAuth();
+  const router = useRouter();
+  const { isPro } = useSubscription(user?.uid ?? null, user?.email);
   const [openVideo, setOpenVideo] = useState(false);
   const [openLevelChange, setOpenLevelChange] = useState(false);
   const [newLevel, setNewLevel] = useState(userData.currentLevelId || "1B");
-  const [workoutMenuAnchor, setWorkoutMenuAnchor] = useState<{ anchorEl: HTMLElement, dateStr: string } | null>(null);
+  const [workoutMenuAnchor, setWorkoutMenuAnchor] = useState<{
+    anchorEl: HTMLElement;
+    dateStr: string;
+  } | null>(null);
+  const workoutTier = userData.workoutTier ?? "beginner";
+  const isAdvancedTrack = workoutTier === "advanced";
+  const isBeginnerTrack = !isAdvancedTrack;
 
   const startDate = new Date(userData.startDate);
   const milestoneDate = addMonths(startDate, 6);
@@ -74,13 +88,22 @@ export default function Dashboard({
   const daysToMilestone = differenceInDays(milestoneDate, today);
 
   // Generate calendar days for the selected month
-  const [currentMonth, setCurrentMonth] = useState(() => startOfMonth(new Date()));
+  const [currentMonth, setCurrentMonth] = useState(() =>
+    startOfMonth(new Date()),
+  );
   const startDateGrid = startOfWeek(currentMonth);
   const endDateGrid = endOfWeek(endOfMonth(currentMonth));
-  
-  const trackingDays = eachDayOfInterval({ start: startDateGrid, end: endDateGrid }).map((d) => format(d, "yyyy-MM-dd"));
 
-  const handleToggle = (dateStr: string, currentStatus: boolean, type?: 'N' | 'C') => {
+  const trackingDays = eachDayOfInterval({
+    start: startDateGrid,
+    end: endDateGrid,
+  }).map((d) => format(d, "yyyy-MM-dd"));
+
+  const handleToggle = (
+    dateStr: string,
+    currentStatus: boolean,
+    type?: "N" | "C",
+  ) => {
     if (onToggleWorkout) {
       onToggleWorkout(dateStr, !currentStatus, type);
     }
@@ -249,28 +272,61 @@ export default function Dashboard({
                 <LocalFireDepartmentIcon color="secondary" /> Stats Overview
               </Typography>
               <Box mt={1}>
-                <Box display="flex" alignItems="center" gap={2} mb={1}>
-                  <Typography variant="body1" color="primary" fontWeight="bold">
-                    Current:{" "}
-                    {userData.currentLevelId
-                      ? LEVELS.find((l) => l.id === userData.currentLevelId)
-                          ?.name
-                      : "Not set"}
-                  </Typography>
-                  <Button
-                    variant="outlined"
-                    size="small"
-                    onClick={() => setOpenLevelChange(true)}
+                {isAdvancedTrack ? (
+                  <Box display="flex" alignItems="center" gap={2} mb={1}>
+                    <Typography
+                      variant="body1"
+                      color="primary"
+                      fontWeight="bold"
+                    >
+                      Current:{" "}
+                      {userData.currentLevelId
+                        ? LEVELS.find((l) => l.id === userData.currentLevelId)
+                            ?.name
+                        : "Not set"}
+                    </Typography>
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      onClick={() => setOpenLevelChange(true)}
+                    >
+                      {userData.currentLevelId ? "Update" : "Set Level"}
+                    </Button>
+                  </Box>
+                ) : (
+                  <Typography
+                    variant="body1"
+                    color="primary"
+                    fontWeight="bold"
+                    mb={1}
                   >
-                    {userData.currentLevelId ? "Update" : "Set Level"}
-                  </Button>
-                </Box>
+                    Beginner session only
+                  </Typography>
+                )}
                 <Typography variant="body2" color="text.secondary">
                   Start Date: {startDate.toLocaleDateString()}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
                   Starting Weight: {userData.startWeight}
                 </Typography>
+                {isBeginnerTrack && (
+                  <Typography variant="body2" color="text.secondary" mt={1}>
+                    Workout option: Burpee without pushups
+                  </Typography>
+                )}
+                <Box mt={1.5}>
+                  <Chip
+                    label={
+                      isAdvancedTrack
+                        ? isPro
+                          ? "Advanced track active"
+                          : "Advanced track selected"
+                        : "Beginner track free forever"
+                    }
+                    color={isAdvancedTrack ? "primary" : "secondary"}
+                    sx={{ fontWeight: 700 }}
+                  />
+                </Box>
                 {userData.trialEndsAt && (
                   <Typography variant="body2" color="secondary" mt={1}>
                     Trial ends on:{" "}
@@ -298,42 +354,56 @@ export default function Dashboard({
           </Grid>
 
           <Grid sx={{ xs: 12, md: 4 }}>
-            <Card
-              sx={{
-                p: 3,
-                height: "100%",
-                display: "flex",
-                flexDirection: "column",
-                justifyContent: "center",
-                alignItems: "center",
-              }}
-            >
-              <IconButton
-                color="primary"
-                size="large"
-                onClick={() => setOpenVideo(true)}
-              >
-                <VideocamIcon sx={{ fontSize: 48 }} />
-              </IconButton>
-              <Typography variant="h6" mt={1}>
-                Tutorials & Intro
-              </Typography>
-            </Card>
+            <WorkoutTimer
+              tier={workoutTier}
+              sealsGoal={
+                userData.currentLevelId
+                  ? LEVELS.find((entry) => entry.id === userData.currentLevelId)
+                      ?.seals
+                  : 0
+              }
+              sixCountsGoal={
+                userData.currentLevelId
+                  ? LEVELS.find((entry) => entry.id === userData.currentLevelId)
+                      ?.sixCounts
+                  : 0
+              }
+              onOpenVideo={() => setOpenVideo(true)}
+            />
           </Grid>
         </Grid>
 
         {/* Monthly Tracker Row */}
         <Card sx={{ p: 3, mb: 4 }}>
-          <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+          <Box
+            display="flex"
+            justifyContent="space-between"
+            alignItems="center"
+            mb={2}
+          >
             <Typography variant="h6" color="primary">
               Workout Calendar
             </Typography>
             <Box display="flex" alignItems="center" gap={1}>
-              <Button size="small" onClick={() => setCurrentMonth(addMonths(currentMonth, -1))}>Prev</Button>
-              <Typography variant="subtitle1" fontWeight="bold" sx={{ minWidth: 120, textAlign: 'center' }}>
+              <Button
+                size="small"
+                onClick={() => setCurrentMonth(addMonths(currentMonth, -1))}
+              >
+                Prev
+              </Button>
+              <Typography
+                variant="subtitle1"
+                fontWeight="bold"
+                sx={{ minWidth: 120, textAlign: "center" }}
+              >
                 {format(currentMonth, "MMMM yyyy")}
               </Typography>
-              <Button size="small" onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}>Next</Button>
+              <Button
+                size="small"
+                onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
+              >
+                Next
+              </Button>
             </Box>
           </Box>
           {syncError && (
@@ -344,22 +414,35 @@ export default function Dashboard({
           <Typography variant="body2" color="text.secondary" mb={2}>
             Check off your workout on scheduled days (Mon, Tue, Thu, Fri)
           </Typography>
-          
-          <Box display="grid" gridTemplateColumns="repeat(7, 1fr)" gap={1} mb={1}>
-            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-              <Typography key={day} variant="caption" color="text.secondary" align="center" fontWeight="bold">
+
+          <Box
+            display="grid"
+            gridTemplateColumns="repeat(7, 1fr)"
+            gap={1}
+            mb={1}
+          >
+            {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
+              <Typography
+                key={day}
+                variant="caption"
+                color="text.secondary"
+                align="center"
+                fontWeight="bold"
+              >
                 {day}
               </Typography>
             ))}
           </Box>
-          
+
           <Box display="grid" gridTemplateColumns="repeat(7, 1fr)" gap={1}>
             {trackingDays.map((dateStr) => {
               const dayObj = new Date(dateStr + "T00:00:00");
               const _dayName = format(dayObj, "EEE");
               const dayLog = getWorkoutLogForDate(dateStr);
               const isCompleted = !!dayLog?.completed;
-              const isWorkoutDay = ["Mon", "Tue", "Thu", "Fri"].includes(_dayName);
+              const isWorkoutDay = ["Mon", "Tue", "Thu", "Fri"].includes(
+                _dayName,
+              );
               const isCurrentMonth = isSameMonth(dayObj, currentMonth);
 
               return (
@@ -383,18 +466,31 @@ export default function Dashboard({
                     opacity: isCurrentMonth ? (isWorkoutDay ? 1 : 0.6) : 0.2,
                   }}
                 >
-                  <Typography variant="body2" fontWeight={isCurrentMonth ? "bold" : "normal"}>
+                  <Typography
+                    variant="body2"
+                    fontWeight={isCurrentMonth ? "bold" : "normal"}
+                  >
                     {format(dayObj, "d")}
                   </Typography>
                   {isWorkoutDay ? (
-                    <Box display="flex" flexDirection="column" alignItems="center" mt={0.5}>
+                    <Box
+                      display="flex"
+                      flexDirection="column"
+                      alignItems="center"
+                      mt={0.5}
+                    >
                       <Checkbox
                         checked={isCompleted}
                         onChange={(e) => {
                           if (isCompleted) {
                             handleToggle(dateStr, true); // uncheck
+                          } else if (isBeginnerTrack) {
+                            handleToggle(dateStr, false);
                           } else {
-                            setWorkoutMenuAnchor({ anchorEl: e.currentTarget, dateStr });
+                            setWorkoutMenuAnchor({
+                              anchorEl: e.currentTarget,
+                              dateStr,
+                            });
                           }
                         }}
                         color="secondary"
@@ -402,13 +498,24 @@ export default function Dashboard({
                         sx={{ p: 0.5 }}
                       />
                       {isCompleted && dayLog?.levelCompleted && (
-                        <Typography variant="caption" sx={{ color: "#00E5FF", lineHeight: 1, fontSize: '0.65rem' }} align="center">
+                        <Typography
+                          variant="caption"
+                          sx={{
+                            color: "#00E5FF",
+                            lineHeight: 1,
+                            fontSize: "0.65rem",
+                          }}
+                          align="center"
+                        >
                           {dayLog.levelCompleted}
                         </Typography>
                       )}
                     </Box>
                   ) : (
-                    <Typography variant="caption" sx={{ mt: 1, color: "#666", fontSize: '0.65rem' }}>
+                    <Typography
+                      variant="caption"
+                      sx={{ mt: 1, color: "#666", fontSize: "0.65rem" }}
+                    >
                       Rest
                     </Typography>
                   )}
@@ -425,7 +532,12 @@ export default function Dashboard({
         <Grid container spacing={2} mb={4}>
           <Grid sx={{ xs: 12, md: 6 }}>
             <Card sx={{ p: 2, height: "100%" }}>
-              <Typography variant="subtitle1" fontWeight={700} color="primary" gutterBottom>
+              <Typography
+                variant="subtitle1"
+                fontWeight={700}
+                color="primary"
+                gutterBottom
+              >
                 Day 1
               </Typography>
               {day1PictureUrl ? (
@@ -455,8 +567,14 @@ export default function Dashboard({
                   onChange={handleDay1PictureChange}
                 />
                 <label htmlFor="update-day1-picture">
-                  <Button variant="outlined" component="span" startIcon={<PhotoCamera />}>
-                    {day1PictureUrl ? "Replace Day 1 Picture" : "Upload Day 1 Picture"}
+                  <Button
+                    variant="outlined"
+                    component="span"
+                    startIcon={<PhotoCamera />}
+                  >
+                    {day1PictureUrl
+                      ? "Replace Day 1 Picture"
+                      : "Upload Day 1 Picture"}
                   </Button>
                 </label>
               </Box>
@@ -464,7 +582,12 @@ export default function Dashboard({
           </Grid>
           <Grid sx={{ xs: 12, md: 6 }}>
             <Card sx={{ p: 2, height: "100%" }}>
-              <Typography variant="subtitle1" fontWeight={700} color="secondary" gutterBottom>
+              <Typography
+                variant="subtitle1"
+                fontWeight={700}
+                color="secondary"
+                gutterBottom
+              >
                 6-Month Check-in
               </Typography>
               {userData.endPictureUrl ? (
@@ -482,99 +605,114 @@ export default function Dashboard({
                 />
               ) : (
                 <Typography variant="body2" color="text.secondary">
-                  Your latest check-in picture will appear here after milestone check-in.
+                  Your latest check-in picture will appear here after milestone
+                  check-in.
                 </Typography>
               )}
             </Card>
           </Grid>
         </Grid>
 
-        {/* Levels List */}
-        <Typography variant="h5" fontWeight={700} gutterBottom mt={4} mb={2}>
-          Program Levels
-        </Typography>
-        <Grid container spacing={2}>
-          {LEVELS.map((lvl) => (
-            <Grid sx={{ xs: 12, sm: 6, md: 3 }} key={lvl.id}>
-              <Card
-                sx={{
-                  p: 3,
-                  transition: "0.3s",
-                  border:
-                    userData.currentLevelId === lvl.id
-                      ? "2px solid #FF3366"
-                      : "1px solid transparent",
-                  "&:hover": {
-                    transform: "translateY(-5px)",
-                    borderColor: "secondary.main",
-                  },
-                }}
-              >
-                <Typography variant="h6" color="secondary" gutterBottom>
-                  {lvl.name} {userData.currentLevelId === lvl.id && "(Current)"}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  {lvl.description}
-                </Typography>
-                {lvl.seals > 0 && (
-                  <Box mt={2} display="flex" gap={1}>
-                    <Chip
-                      label={`${lvl.seals} Seals`}
-                      size="small"
-                      variant="outlined"
-                    />
-                    <Chip
-                      label={`${lvl.sixCounts} 6-counts`}
-                      size="small"
-                      variant="outlined"
-                    />
-                  </Box>
-                )}
-              </Card>
+        {isAdvancedTrack && (
+          <>
+            <Typography
+              variant="h5"
+              fontWeight={700}
+              gutterBottom
+              mt={4}
+              mb={2}
+            >
+              Program Levels
+            </Typography>
+            <Grid container spacing={2}>
+              {LEVELS.map((lvl) => (
+                <Grid sx={{ xs: 12, sm: 6, md: 3 }} key={lvl.id}>
+                  <Card
+                    sx={{
+                      p: 3,
+                      transition: "0.3s",
+                      border:
+                        userData.currentLevelId === lvl.id
+                          ? "2px solid #FF3366"
+                          : "1px solid transparent",
+                      "&:hover": {
+                        transform: "translateY(-5px)",
+                        borderColor: "secondary.main",
+                      },
+                    }}
+                  >
+                    <Typography variant="h6" color="secondary" gutterBottom>
+                      {lvl.name}{" "}
+                      {userData.currentLevelId === lvl.id && "(Current)"}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      {lvl.description}
+                    </Typography>
+                    {lvl.seals > 0 && (
+                      <Box mt={2} display="flex" gap={1}>
+                        <Chip
+                          label={`${lvl.seals} Seals`}
+                          size="small"
+                          variant="outlined"
+                        />
+                        <Chip
+                          label={`${lvl.sixCounts} 6-counts`}
+                          size="small"
+                          variant="outlined"
+                        />
+                      </Box>
+                    )}
+                  </Card>
+                </Grid>
+              ))}
             </Grid>
-          ))}
-        </Grid>
+          </>
+        )}
 
         {/* Update Level Dialog */}
-        <Dialog
-          open={openLevelChange}
-          onClose={() => setOpenLevelChange(false)}
-          maxWidth="sm"
-          fullWidth
-        >
-          <DialogTitle>Update Current Level</DialogTitle>
-          <DialogContent>
-            <Typography variant="body2" color="text.secondary" mb={3}>
-              Have you progressed or want to scale back? Select your new active
-              level.
-            </Typography>
-            <FormControl fullWidth>
-              <InputLabel id="change-level-label">Level</InputLabel>
-              <Select
-                labelId="change-level-label"
-                value={newLevel}
-                label="Level"
-                onChange={(e) => setNewLevel(e.target.value)}
-              >
-                {LEVELS.map((lvl) => (
-                  <MenuItem key={lvl.id} value={lvl.id}>
-                    {lvl.name} - {lvl.description}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-            <Box mt={3} display="flex" justifyContent="flex-end" gap={2}>
-              <Button onClick={() => setOpenLevelChange(false)}>Cancel</Button>
-              <Button
-                variant="contained"
-                color="primary"
-                onClick={handleChangeLevel}
-              >
-                Save Level
-              </Button>
-            </Box>
-          </DialogContent>
-        </Dialog>
+        {isAdvancedTrack && (
+          <Dialog
+            open={openLevelChange}
+            onClose={() => setOpenLevelChange(false)}
+            maxWidth="sm"
+            fullWidth
+          >
+            <DialogTitle>Update Current Level</DialogTitle>
+            <DialogContent>
+              <Typography variant="body2" color="text.secondary" mb={3}>
+                Have you progressed or want to scale back? Select your new
+                active level.
+              </Typography>
+              <FormControl fullWidth>
+                <InputLabel id="change-level-label">Level</InputLabel>
+                <Select
+                  labelId="change-level-label"
+                  value={newLevel}
+                  label="Level"
+                  onChange={(e) => setNewLevel(e.target.value)}
+                >
+                  {LEVELS.map((lvl) => (
+                    <MenuItem key={lvl.id} value={lvl.id}>
+                      {lvl.name} - {lvl.description}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+              <Box mt={3} display="flex" justifyContent="flex-end" gap={2}>
+                <Button onClick={() => setOpenLevelChange(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  variant="contained"
+                  color="primary"
+                  onClick={handleChangeLevel}
+                >
+                  Save Level
+                </Button>
+              </Box>
+            </DialogContent>
+          </Dialog>
+        )}
 
         {/* Video Dialog */}
         <Dialog
@@ -583,55 +721,119 @@ export default function Dashboard({
           maxWidth="md"
           fullWidth
         >
-          <DialogTitle>Program Tutorials</DialogTitle>
+          <DialogTitle>
+            {isAdvancedTrack ? "Advanced Tutorials" : "Beginner Program Video"}
+          </DialogTitle>
           <DialogContent>
             <Box
               sx={{ display: "flex", flexDirection: "column", gap: 3, pt: 1 }}
             >
-              <Card sx={{ p: 2 }}>
-                <Typography variant="subtitle1" mb={1} fontWeight="bold">
-                  Program Intro (Full Video)
-                </Typography>
-                <a
-                  href="https://www.youtube.com/watch?v=3Yooen5zgCg&list=PLhE7BYqSXmSEuE2qoJE9w3rLEzuenuoLq&index=1"
-                  target="_blank"
-                  rel="noreferrer"
-                  style={{ color: "#00E5FF" }}
-                >
-                  Watch on YouTube
-                </a>
-              </Card>
-              <Card sx={{ p: 2 }}>
-                <Typography variant="subtitle1" mb={1} fontWeight="bold">
-                  Burpee Form Tutorials
-                </Typography>
-                <a
-                  href="https://www.youtube.com/playlist?list=PLhE7BYqSXmSEJFzla9_j34HEmLdEsOrvF"
-                  target="_blank"
-                  rel="noreferrer"
-                  style={{ color: "#00E5FF" }}
-                >
-                  View Playlist on YouTube
-                </a>
-              </Card>
+              {!isAdvancedTrack && (
+                <Card sx={{ p: 3, border: "1px dashed rgba(255,255,255,0.2)" }}>
+                  <Typography variant="subtitle1" mb={1} fontWeight="bold">
+                    Beginner Video Placeholder
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary" mb={2}>
+                    Add your beginner walkthrough video here later. This section
+                    stays free for all beginner users.
+                  </Typography>
+                  <Box
+                    sx={{
+                      borderRadius: 2,
+                      minHeight: 220,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      background:
+                        "linear-gradient(135deg, rgba(0,229,255,0.08), rgba(255,255,255,0.04))",
+                    }}
+                  >
+                    <Typography variant="body1" color="text.secondary">
+                      Video placeholder
+                    </Typography>
+                  </Box>
+                </Card>
+              )}
+
+              {isAdvancedTrack && isPro && (
+                <>
+                  <Card sx={{ p: 2 }}>
+                    <Typography variant="subtitle1" mb={1} fontWeight="bold">
+                      Program Intro (Full Video)
+                    </Typography>
+                    <a
+                      href="https://www.youtube.com/watch?v=3Yooen5zgCg&list=PLhE7BYqSXmSEuE2qoJE9w3rLEzuenuoLq&index=1"
+                      target="_blank"
+                      rel="noreferrer"
+                      style={{ color: "#00E5FF" }}
+                    >
+                      Watch on YouTube
+                    </a>
+                  </Card>
+                  <Card sx={{ p: 2 }}>
+                    <Typography variant="subtitle1" mb={1} fontWeight="bold">
+                      Burpee Form Tutorials
+                    </Typography>
+                    <a
+                      href="https://www.youtube.com/playlist?list=PLhE7BYqSXmSEJFzla9_j34HEmLdEsOrvF"
+                      target="_blank"
+                      rel="noreferrer"
+                      style={{ color: "#00E5FF" }}
+                    >
+                      View Playlist on YouTube
+                    </a>
+                  </Card>
+                </>
+              )}
+
+              {isAdvancedTrack && !isPro && (
+                <Card sx={{ p: 3, border: "1px solid rgba(245,158,11,0.35)" }}>
+                  <Typography variant="subtitle1" mb={1} fontWeight="bold">
+                    Advanced videos are paid
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary" mb={2}>
+                    Beginner stays free. Subscribe to unlock the advanced
+                    tutorial library and premium training content.
+                  </Typography>
+                  <Button
+                    variant="contained"
+                    onClick={() => {
+                      setOpenVideo(false);
+                      router.push("/pricing");
+                    }}
+                  >
+                    View Advanced Pricing
+                  </Button>
+                </Card>
+              )}
             </Box>
           </DialogContent>
         </Dialog>
         {/* Workout Selection Menu */}
-        <Menu
-          anchorEl={workoutMenuAnchor?.anchorEl}
-          open={Boolean(workoutMenuAnchor)}
-          onClose={() => setWorkoutMenuAnchor(null)}
-        >
-          <MenuItem onClick={() => {
-            handleToggle(workoutMenuAnchor!.dateStr, false, 'N');
-            setWorkoutMenuAnchor(null);
-          }}>Burpee + Pushups</MenuItem>
-          <MenuItem onClick={() => {
-            handleToggle(workoutMenuAnchor!.dateStr, false, 'C');
-            setWorkoutMenuAnchor(null);
-          }}>Burpee (no pushups)</MenuItem>
-        </Menu>
+        {isAdvancedTrack && (
+          <Menu
+            anchorEl={workoutMenuAnchor?.anchorEl}
+            open={Boolean(workoutMenuAnchor)}
+            onClose={() => setWorkoutMenuAnchor(null)}
+          >
+            <MenuItem
+              onClick={() => {
+                handleToggle(workoutMenuAnchor!.dateStr, false, "N");
+                setWorkoutMenuAnchor(null);
+              }}
+            >
+              Burpee + Pushups
+            </MenuItem>
+            <MenuItem
+              onClick={() => {
+                handleToggle(workoutMenuAnchor!.dateStr, false, "C");
+                setWorkoutMenuAnchor(null);
+              }}
+            >
+              Burpee (no pushups)
+            </MenuItem>
+          </Menu>
+        )}
       </motion.div>
     </Box>
   );

@@ -69,9 +69,9 @@ export default function LandingPage() {
               color="text.secondary"
               sx={{ maxWidth: 760 }}
             >
-              Learn the story behind the burpee, why it still works, and when to
-              train with push-ups vs without push-ups. Inside the app, you can
-              choose either version for the same 20-minute sessions.
+              Choose a completely free beginner track or unlock the paid
+              advanced track. Both are built around simple, consistent burpee
+              training.
             </Typography>
             <Typography
               variant="body1"
@@ -84,6 +84,32 @@ export default function LandingPage() {
               Consistency is the real secret. Follow your schedule, show up on
               your training days, and progress compounds.
             </Typography>
+            <Box
+              sx={{
+                maxWidth: 760,
+                px: 2,
+                py: 1.5,
+                borderRadius: 2,
+                background: "rgba(255,255,255,0.04)",
+                border: "1px solid rgba(255,255,255,0.1)",
+              }}
+            >
+              <Typography
+                variant="body2"
+                color="rgba(255,255,255,0.92)"
+                fontWeight={700}
+              >
+                Inspired by the Busy Dad Program by Busy Dad Training.
+              </Typography>
+              <Typography
+                variant="body2"
+                color="text.secondary"
+                sx={{ mt: 0.5 }}
+              >
+                This app is an independent project and is not affiliated with or
+                endorsed by Busy Dad Training.
+              </Typography>
+            </Box>
             <Stack direction={{ xs: "column", sm: "row" }} spacing={2} pt={1}>
               <Button
                 variant="contained"
@@ -91,14 +117,14 @@ export default function LandingPage() {
                 startIcon={<WorkspacePremiumIcon />}
                 onClick={() => router.push("/login")}
               >
-                Start Free 30-Day Plan
+                Start Beginner Free
               </Button>
               <Button
                 variant="outlined"
                 size="large"
                 onClick={() => router.push("/pricing")}
               >
-                See Pro Plans
+                See Advanced Pricing
               </Button>
               <Button
                 variant="text"
@@ -176,7 +202,7 @@ export default function LandingPage() {
             keep your streak visible, and stay accountable to your plan.
           </Typography>
           <Chip
-            label="Free for 30 days for all users"
+            label="Beginner is free forever"
             sx={{
               mb: 2.5,
               bgcolor: "rgba(0,229,255,0.12)",
@@ -237,13 +263,58 @@ export default function LandingPage() {
           </Box>
           <Stack direction={{ xs: "column", sm: "row" }} spacing={1.2}>
             <Chip label="Follow the schedule" color="secondary" />
-            <Chip label="Track every session" color="primary" />
+            <Chip label="Beginner stays free" color="primary" />
             <Chip
-              label="Pro helps you stay consistent"
+              label="Advanced unlocks premium coaching"
               sx={{ bgcolor: "rgba(255,255,255,0.1)", color: "white" }}
             />
           </Stack>
         </Card>
+
+        <Box
+          sx={{
+            display: "grid",
+            gridTemplateColumns: { xs: "1fr", md: "repeat(2, minmax(0, 1fr))" },
+            gap: 3,
+            mb: 3,
+          }}
+        >
+          <Card sx={{ p: 3.5, border: "1px solid rgba(0,229,255,0.35)" }}>
+            <Typography
+              variant="h5"
+              fontWeight={800}
+              mb={1}
+              color="secondary.main"
+            >
+              Beginner
+            </Typography>
+            <Typography variant="body1" color="text.secondary" mb={1}>
+              Free forever. Use it to build consistency, learn the movement, and
+              add your starter video later.
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Best for people starting out or anyone who wants a no-cost entry
+              point.
+            </Typography>
+          </Card>
+          <Card sx={{ p: 3.5, border: "1px solid rgba(245,158,11,0.45)" }}>
+            <Typography
+              variant="h5"
+              fontWeight={800}
+              mb={1}
+              color="warning.main"
+            >
+              Advanced
+            </Typography>
+            <Typography variant="body1" color="text.secondary" mb={1}>
+              Paid track with premium workout content, advanced tutorials, and
+              subscription-backed features.
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              This is the only track that carries charges.
+            </Typography>
+          </Card>
+        </Box>
 
         <Grid container spacing={3}>
           <Grid sx={{ xs: 12, md: 6 }}>
