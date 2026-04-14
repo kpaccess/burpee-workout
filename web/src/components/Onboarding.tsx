@@ -26,6 +26,7 @@ interface OnboardingProps {
     startWeight: number;
     startPictureUrl: string | null;
     currentLevelId: string;
+    trialEndsAt: string;
   }) => void;
 }
 
@@ -55,11 +56,18 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!weight) return;
+
+    // 30-day free plan for all users, starting from their chosen start date.
+    const start = new Date(`${startDate}T00:00:00`);
+    const trialEnds = new Date(start);
+    trialEnds.setDate(trialEnds.getDate() + 30);
+
     onComplete({
       startDate,
       startWeight: parseFloat(weight),
       startPictureUrl: pictureUrl,
       currentLevelId: level,
+      trialEndsAt: trialEnds.toISOString(),
     });
   };
 

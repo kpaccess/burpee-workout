@@ -70,7 +70,8 @@ export default function LandingPage() {
               sx={{ maxWidth: 760 }}
             >
               Learn the story behind the burpee, why it still works, and when to
-              train with push-ups vs without push-ups.
+              train with push-ups vs without push-ups. Inside the app, you can
+              choose either version for the same 20-minute sessions.
             </Typography>
             <Typography
               variant="body1"
@@ -88,9 +89,9 @@ export default function LandingPage() {
                 variant="contained"
                 size="large"
                 startIcon={<WorkspacePremiumIcon />}
-                onClick={() => router.push("/pricing")}
+                onClick={() => router.push("/login")}
               >
-                Become Pro Member
+                Start Free 30-Day Plan
               </Button>
               <Button
                 variant="outlined"
@@ -174,6 +175,17 @@ export default function LandingPage() {
             BurpeePacer Pro is built for this exact goal: track every workout,
             keep your streak visible, and stay accountable to your plan.
           </Typography>
+          <Chip
+            label="Free for 30 days for all users"
+            sx={{
+              mb: 2.5,
+              bgcolor: "rgba(0,229,255,0.12)",
+              color: "rgba(255,255,255,0.92)",
+              border: "1px solid rgba(0,229,255,0.35)",
+              fontWeight: 800,
+              alignSelf: "flex-start",
+            }}
+          />
           <Typography variant="subtitle1" fontWeight={700} mb={1.2}>
             Weekly Schedule (Example)
           </Typography>

@@ -271,6 +271,12 @@ export default function Dashboard({
                 <Typography variant="body2" color="text.secondary">
                   Starting Weight: {userData.startWeight}
                 </Typography>
+                {userData.trialEndsAt && (
+                  <Typography variant="body2" color="secondary" mt={1}>
+                    Trial ends on:{" "}
+                    {new Date(userData.trialEndsAt).toLocaleDateString()}
+                  </Typography>
+                )}
                 {!isMilestoneReached && daysToMilestone > 0 && (
                   <Typography variant="body2" color="secondary" mt={1}>
                     {daysToMilestone} days until 6-month check-in.
@@ -620,11 +626,11 @@ export default function Dashboard({
           <MenuItem onClick={() => {
             handleToggle(workoutMenuAnchor!.dateStr, false, 'N');
             setWorkoutMenuAnchor(null);
-          }}>Navy Seals (N)</MenuItem>
+          }}>Burpee + Pushups</MenuItem>
           <MenuItem onClick={() => {
             handleToggle(workoutMenuAnchor!.dateStr, false, 'C');
             setWorkoutMenuAnchor(null);
-          }}>6-counts (C)</MenuItem>
+          }}>Burpee (no pushups)</MenuItem>
         </Menu>
       </motion.div>
     </Box>

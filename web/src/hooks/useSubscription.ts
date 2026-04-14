@@ -7,6 +7,8 @@ import { isAllowlisted } from "@/lib/allowlist";
 
 interface SubscriptionState {
   isPro: boolean;
+  isTrialing: boolean;
+  trialEndsAt: string | null;
   stripeCustomerId: string | null;
   subscriptionStatus: string | null;
   loading: boolean;
@@ -18,6 +20,8 @@ export function useSubscription(
 ): SubscriptionState {
   const [state, setState] = useState<SubscriptionState>({
     isPro: false,
+    isTrialing: false,
+    trialEndsAt: null,
     stripeCustomerId: null,
     subscriptionStatus: null,
     loading: true,
@@ -28,6 +32,8 @@ export function useSubscription(
     if (isAllowlisted(userEmail)) {
       setState({
         isPro: true,
+        isTrialing: false,
+        trialEndsAt: null,
         stripeCustomerId: null,
         subscriptionStatus: "active",
         loading: false,
@@ -44,15 +50,27 @@ export function useSubscription(
     const unsubscribe = onSnapshot(userRef, (snap) => {
       if (snap.exists()) {
         const data = snap.data();
+        const trialEndsAt = data.trialEndsAt as string | undefined;
+        const isTrialActive =
+          typeof trialEndsAt === "string" &&
+          Number.isFinite(Date.parse(trialEndsAt)) &&
+          Date.now() < Date.parse(trialEndsAt);
+
         setState({
-          isPro: data.isPro === true,
+          isPro: data.isPro === true || isTrialActive,
+          isTrialing: isTrialActive,
+          trialEndsAt: trialEndsAt ?? null,
           stripeCustomerId: data.stripeCustomerId ?? null,
-          subscriptionStatus: data.subscriptionStatus ?? null,
+          subscriptionStatus: isTrialActive
+            ? "trialing"
+            : (data.subscriptionStatus ?? null),
           loading: false,
         });
       } else {
         setState({
           isPro: false,
+          isTrialing: false,
+          trialEndsAt: null,
           stripeCustomerId: null,
           subscriptionStatus: null,
           loading: false,

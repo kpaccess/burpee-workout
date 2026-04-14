@@ -58,7 +58,11 @@ export function useUserData() {
     }
   };
 
-  const toggleWorkoutLog = async (dateStr: string, completed: boolean, type?: 'N' | 'C') => {
+  const toggleWorkoutLog = async (
+    dateStr: string,
+    completed: boolean,
+    type?: "N" | "C",
+  ) => {
     if (!user || !userData) return;
     const normalizedDate = toDateKey(dateStr);
     
@@ -67,6 +71,12 @@ export function useUserData() {
     const idx = logs.findIndex(l => toDateKey(l.date) === normalizedDate);
     const typeSuffix = type ? `(${type})` : '';
     const levelCompleted = completed ? `${userData.currentLevelId || ''}${typeSuffix}` : null;
+    const workoutType =
+      type === "N"
+        ? "with_pushups"
+        : type === "C"
+          ? "no_pushups"
+          : undefined;
     
     if (idx >= 0) {
       logs[idx].completed = completed;
@@ -76,9 +86,15 @@ export function useUserData() {
       } else {
         delete logs[idx].levelCompleted; // Remove field to prevent undefined/null Firestore complaints
       }
+      if (workoutType) {
+        (logs[idx] as any).workoutType = workoutType;
+      } else {
+        delete (logs[idx] as any).workoutType;
+      }
     } else {
       const newLog = { date: normalizedDate, completed } as any;
       if (levelCompleted) newLog.levelCompleted = levelCompleted;
+      if (workoutType) newLog.workoutType = workoutType;
       logs.push(newLog);
     }
     

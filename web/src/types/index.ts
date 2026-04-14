@@ -2,6 +2,12 @@ export interface WorkoutLog {
   date: string; // YYYY-MM-DD
   completed: boolean;
   levelCompleted?: string;
+  /**
+   * Workout variant completed that day.
+   * - with_pushups: burpee + pushups
+   * - no_pushups: burpee only
+   */
+  workoutType?: "with_pushups" | "no_pushups";
   notes?: string;
 }
 
@@ -10,6 +16,7 @@ export interface UserData {
   startDate: string;
   startWeight: number;
   startPictureUrl: string | null;
+  trialEndsAt?: string; // ISO timestamp
 
   endDate?: string;
   endWeight?: number;

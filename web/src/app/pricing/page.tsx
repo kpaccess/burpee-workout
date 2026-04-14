@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import {
+  Alert,
   Box,
   Button,
   Card,
@@ -33,15 +34,34 @@ const PRO_FEATURES = [
 
 export default function PricingPage() {
   const { user } = useAuth();
-  const { isPro, stripeCustomerId, loading } = useSubscription(
-    user?.uid ?? null,
-    user?.email,
-  );
+  const { isPro, isTrialing, trialEndsAt, stripeCustomerId, loading } =
+    useSubscription(
+      user?.uid ?? null,
+      user?.email,
+    );
+  const [checkoutError, setCheckoutError] = useState<string | null>(null);
+  const [portalError, setPortalError] = useState<string | null>(null);
+  const isPaidSubscriber = isPro && !isTrialing;
+  const canStartTrial = Boolean(user) && !isPro && !trialEndsAt;
+  const formattedTrialEnd = trialEndsAt
+    ? new Date(trialEndsAt).toLocaleDateString()
+    : null;
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [portalLoading, setPortalLoading] = useState(false);
   const router = useRouter();
   const handleUpgrade = async () => {
+    if (canStartTrial) {
+      router.push("/");
+      return;
+    }
+
+    if (!user) {
+      router.push("/login?next=/pricing");
+      return;
+    }
+
     setCheckoutLoading(true);
+    setCheckoutError(null);
     try {
       const res = await fetch("/api/stripe/checkout", {
         method: "POST",
@@ -53,17 +73,22 @@ export default function PricingPage() {
         }),
       });
       const { url, error } = await res.json();
+      if (!res.ok) throw new Error(error ?? "Unable to start checkout");
       if (error) throw new Error(error);
+      if (!url) throw new Error("Missing Stripe checkout URL");
       window.location.href = url;
     } catch (err) {
       console.error("Checkout error:", err);
       setCheckoutLoading(false);
+      const message = err instanceof Error ? err.message : String(err);
+      setCheckoutError(message);
     }
   };
 
   const handleManageBilling = async () => {
     if (!stripeCustomerId) return;
     setPortalLoading(true);
+    setPortalError(null);
     try {
       const res = await fetch("/api/stripe/portal", {
         method: "POST",
@@ -71,11 +96,15 @@ export default function PricingPage() {
         body: JSON.stringify({ customerId: stripeCustomerId }),
       });
       const { url, error } = await res.json();
+      if (!res.ok) throw new Error(error ?? "Unable to open billing portal");
       if (error) throw new Error(error);
+      if (!url) throw new Error("Missing Stripe portal URL");
       window.location.href = url;
     } catch (err) {
       console.error("Portal error:", err);
       setPortalLoading(false);
+      const message = err instanceof Error ? err.message : String(err);
+      setPortalError(message);
     }
   };
 
@@ -199,7 +228,7 @@ export default function PricingPage() {
               ) : isPro ? (
                 <Box sx={{ mt: 3 }}>
                   <Chip
-                    label="✓ You're on Pro"
+                    label={isTrialing ? "✓ 30-day free trial active" : "✓ You're on Pro"}
                     sx={{
                       width: "100%",
                       background: "linear-gradient(135deg, #f59e0b, #ef4444)",
@@ -210,7 +239,29 @@ export default function PricingPage() {
                       borderRadius: 2,
                     }}
                   />
-                  {stripeCustomerId && (
+                  {isTrialing && formattedTrialEnd && (
+                    <Typography
+                      variant="body2"
+                      color="grey.400"
+                      sx={{ mt: 1.5, textAlign: "center" }}
+                    >
+                      Trial ends on {formattedTrialEnd}
+                    </Typography>
+                  )}
+
+                  {isTrialing && (
+                    <Button
+                      fullWidth
+                      variant="outlined"
+                      onClick={handleUpgrade}
+                      disabled={checkoutLoading}
+                      sx={{ mt: 1.5, borderColor: "rgba(255,255,255,0.25)", color: "white" }}
+                    >
+                      {checkoutLoading ? "Redirecting..." : "Upgrade now"}
+                    </Button>
+                  )}
+
+                  {isPaidSubscriber && stripeCustomerId && (
                     <Button
                       fullWidth
                       variant="text"
@@ -224,6 +275,11 @@ export default function PricingPage() {
                         "Manage Billing"
                       )}
                     </Button>
+                  )}
+                  {portalError && (
+                    <Alert severity="error" sx={{ mt: 1.5 }}>
+                      {portalError}
+                    </Alert>
                   )}
                 </Box>
               ) : (
@@ -254,10 +310,17 @@ export default function PricingPage() {
                 >
                   {checkoutLoading
                     ? "Redirecting..."
+                    : canStartTrial
+                      ? "Start 30-day free trial"
                     : user
                       ? "Upgrade to Pro"
-                      : "Sign in & Upgrade"}
+                      : "Sign in to start free trial"}
                 </Button>
+              )}
+              {checkoutError && (
+                <Alert severity="error" sx={{ mt: 2 }}>
+                  {checkoutError}
+                </Alert>
               )}
             </CardContent>
           </Card>
