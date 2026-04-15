@@ -5,7 +5,6 @@ import { useUserData } from "../hooks/useUserData";
 import Onboarding from "../components/Onboarding";
 import Dashboard from "../components/Dashboard";
 import MilestoneCheckin from "../components/MilestoneCheckin";
-import Login from "../components/Login";
 import LandingPage from "../components/LandingPage";
 import { useAuth } from "../context/AuthContext";
 import {
@@ -18,14 +17,8 @@ import {
 } from "@mui/material";
 
 export default function Home() {
-  const {
-    userData,
-    isLoaded,
-    saveUserData,
-    clearUserData,
-    toggleWorkoutLog,
-    syncError,
-  } = useUserData();
+  const { userData, isLoaded, saveUserData, toggleWorkoutLog, syncError } =
+    useUserData();
   const { user, loading: authLoading } = useAuth();
   const [showMilestoneCheckin, setShowMilestoneCheckin] = useState(false);
 
@@ -97,7 +90,6 @@ export default function Home() {
   return (
     <Dashboard
       userData={userData}
-      onClear={clearUserData}
       onMilestoneCheckin={() => setShowMilestoneCheckin(true)}
       onToggleWorkout={toggleWorkoutLog}
       onUpdateData={saveUserData}

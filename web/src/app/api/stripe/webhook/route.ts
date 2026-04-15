@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
+import type Stripe from "stripe";
 import stripe from "@/lib/stripe";
 import { db } from "@/lib/firebase";
 import { doc, setDoc } from "firebase/firestore";
+
+type StripeInvoiceWithSubscription = Stripe.Invoice & {
+  subscription?: string | Stripe.Subscription | null;
+};
 
 // Store a pending subscription keyed by email for users who paid before creating an account
 async function storePendingSubscription(
@@ -35,8 +40,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let event: any;
+  let event: Stripe.Event;
   try {
     event = stripe.webhooks.constructEvent(body, sig, webhookSecret);
   } catch (err) {
@@ -48,7 +52,7 @@ export async function POST(req: NextRequest) {
     switch (event.type) {
       // Payment succeeded → unlock Pro
       case "checkout.session.completed": {
-        const session = event.data.object as Record<string, any>;
+        const session = event.data.object as Stripe.Checkout.Session;
         const firebaseUserId = session.metadata?.firebaseUserId;
         if (firebaseUserId) {
           // Logged-in user: update their Firestore doc directly
@@ -77,10 +81,15 @@ export async function POST(req: NextRequest) {
 
       // Subscription renewed successfully
       case "invoice.payment_succeeded": {
-        const invoice = event.data.object as Record<string, any>;
-        const sub = await stripe.subscriptions.retrieve(
-          invoice.subscription as string,
-        );
+        const invoice = event.data.object as StripeInvoiceWithSubscription;
+        const subscriptionId =
+          typeof invoice.subscription === "string"
+            ? invoice.subscription
+            : invoice.subscription?.id;
+        if (!subscriptionId) {
+          break;
+        }
+        const sub = await stripe.subscriptions.retrieve(subscriptionId);
         const firebaseUserId = sub.metadata?.firebaseUserId;
         if (firebaseUserId) {
           await updateFirestoreUser(firebaseUserId, {
@@ -93,10 +102,15 @@ export async function POST(req: NextRequest) {
 
       // Payment failed → downgrade
       case "invoice.payment_failed": {
-        const invoice = event.data.object as Record<string, any>;
-        const sub = await stripe.subscriptions.retrieve(
-          invoice.subscription as string,
-        );
+        const invoice = event.data.object as StripeInvoiceWithSubscription;
+        const subscriptionId =
+          typeof invoice.subscription === "string"
+            ? invoice.subscription
+            : invoice.subscription?.id;
+        if (!subscriptionId) {
+          break;
+        }
+        const sub = await stripe.subscriptions.retrieve(subscriptionId);
         const firebaseUserId = sub.metadata?.firebaseUserId;
         if (firebaseUserId) {
           await updateFirestoreUser(firebaseUserId, {
@@ -109,7 +123,7 @@ export async function POST(req: NextRequest) {
 
       // Subscription canceled
       case "customer.subscription.deleted": {
-        const sub = event.data.object as Record<string, any>;
+        const sub = event.data.object as Stripe.Subscription;
         const firebaseUserId = sub.metadata?.firebaseUserId;
         if (firebaseUserId) {
           await updateFirestoreUser(firebaseUserId, {

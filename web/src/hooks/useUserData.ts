@@ -1,8 +1,12 @@
 import { useState, useEffect } from "react";
-import { UserData } from "../types";
+import { UserData, WorkoutLog } from "../types";
 import { useAuth } from "../context/AuthContext";
 import { getUserData, saveUserDataDB } from "../lib/db";
 import { toDateKey } from "../lib/date";
+
+type PersistedWorkoutLog = WorkoutLog & {
+  workoutType?: "with_pushups" | "no_pushups";
+};
 
 export function useUserData() {
   const { user } = useAuth();
@@ -110,24 +114,28 @@ export function useUserData() {
         delete logs[idx].levelCompleted; // Remove field to prevent undefined/null Firestore complaints
       }
       if (workoutType) {
-        (logs[idx] as any).workoutType = workoutType;
+        (logs[idx] as PersistedWorkoutLog).workoutType = workoutType;
       } else {
-        delete (logs[idx] as any).workoutType;
+        delete (logs[idx] as PersistedWorkoutLog).workoutType;
       }
     } else {
-      const newLog = { date: normalizedDate, completed } as any;
+      const newLog: PersistedWorkoutLog = { date: normalizedDate, completed };
       if (levelCompleted) newLog.levelCompleted = levelCompleted;
       if (workoutType) newLog.workoutType = workoutType;
       logs.push(newLog);
     }
 
     // Clean array from any undefined fields just in case
-    const safeLogs = logs.map((l) =>
-      Object.fromEntries(Object.entries(l).filter(([_, v]) => v !== undefined)),
-    );
+    const safeLogs: PersistedWorkoutLog[] = logs.map((log) => ({
+      date: log.date,
+      completed: log.completed,
+      ...(log.levelCompleted ? { levelCompleted: log.levelCompleted } : {}),
+      ...(log.workoutType ? { workoutType: log.workoutType } : {}),
+      ...(log.notes ? { notes: log.notes } : {}),
+    }));
 
     try {
-      await saveUserData({ workoutLogs: safeLogs as any });
+      await saveUserData({ workoutLogs: safeLogs });
     } catch (e) {
       console.warn("Handled save error:", e);
     }

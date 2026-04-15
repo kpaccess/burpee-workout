@@ -32,7 +32,6 @@ import {
   differenceInDays,
   isAfter,
   format,
-  subDays,
   startOfMonth,
   endOfMonth,
   eachDayOfInterval,
@@ -40,7 +39,6 @@ import {
   endOfWeek,
   isSameMonth,
 } from "date-fns";
-import VideocamIcon from "@mui/icons-material/Videocam";
 import LocalFireDepartmentIcon from "@mui/icons-material/LocalFireDepartment";
 import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
 import { useAuth } from "../context/AuthContext";
@@ -51,7 +49,6 @@ import WorkoutTimer from "./WorkoutTimer";
 
 interface DashboardProps {
   userData: UserData;
-  onClear: () => void;
   onMilestoneCheckin: () => void;
   onToggleWorkout?: (
     dateStr: string,
@@ -64,7 +61,6 @@ interface DashboardProps {
 
 export default function Dashboard({
   userData,
-  onClear,
   onMilestoneCheckin,
   onToggleWorkout,
   onUpdateData,
@@ -180,7 +176,7 @@ export default function Dashboard({
     (userData as UserData & { startPictureURl?: string }).startPictureURl ||
     null;
   const currentLevel = userData.currentLevelId
-    ? levelsForTrack.find((l) => l.id === userData.currentLevelId) ?? null
+    ? (levelsForTrack.find((l) => l.id === userData.currentLevelId) ?? null)
     : null;
   const hasCompletedB6 = (userData.workoutLogs ?? []).some(
     (log) => log.completed && (log.levelCompleted ?? "").startsWith("B6"),
@@ -364,8 +360,7 @@ export default function Dashboard({
                       color="primary"
                       fontWeight="bold"
                     >
-                      Current:{" "}
-                      {currentLevel?.name ?? "Not set"}
+                      Current: {currentLevel?.name ?? "Not set"}
                     </Typography>
                     <Button
                       variant="outlined"
@@ -446,12 +441,8 @@ export default function Dashboard({
           <Grid sx={{ xs: 12, md: 4 }}>
             <WorkoutTimer
               tier={workoutTier}
-              sealsGoal={
-                currentLevel?.seals ?? 0
-              }
-              sixCountsGoal={
-                currentLevel?.sixCounts ?? 0
-              }
+              sealsGoal={currentLevel?.seals ?? 0}
+              sixCountsGoal={currentLevel?.sixCounts ?? 0}
               onOpenVideo={() => setOpenVideo(true)}
             />
           </Grid>
@@ -719,7 +710,8 @@ export default function Dashboard({
                   }}
                 >
                   <Typography variant="h6" color="secondary" gutterBottom>
-                    {lvl.name} {userData.currentLevelId === lvl.id && "(Current)"}
+                    {lvl.name}{" "}
+                    {userData.currentLevelId === lvl.id && "(Current)"}
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
                     {lvl.description}

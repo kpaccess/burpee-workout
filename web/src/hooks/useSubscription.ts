@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { db } from "@/lib/firebase";
 import { doc, onSnapshot } from "firebase/firestore";
 import { isAllowlisted } from "@/lib/allowlist";
@@ -14,35 +14,31 @@ interface SubscriptionState {
   loading: boolean;
 }
 
+const defaultState: SubscriptionState = {
+  isPro: false,
+  isTrialing: false,
+  trialEndsAt: null,
+  stripeCustomerId: null,
+  subscriptionStatus: null,
+  loading: true,
+};
+
+interface FirestoreSubscriptionState extends SubscriptionState {
+  userId: string | null;
+}
+
 export function useSubscription(
   userId: string | null,
   userEmail?: string | null,
 ): SubscriptionState {
-  const [state, setState] = useState<SubscriptionState>({
-    isPro: false,
-    isTrialing: false,
-    trialEndsAt: null,
-    stripeCustomerId: null,
-    subscriptionStatus: null,
-    loading: true,
+  const [state, setState] = useState<FirestoreSubscriptionState>({
+    ...defaultState,
+    userId: null,
   });
+  const isAllowlistedUser = isAllowlisted(userEmail);
 
   useEffect(() => {
-    // Allowlisted users (admin + friends/family) always get Pro
-    if (isAllowlisted(userEmail)) {
-      setState({
-        isPro: true,
-        isTrialing: false,
-        trialEndsAt: null,
-        stripeCustomerId: null,
-        subscriptionStatus: "active",
-        loading: false,
-      });
-      return;
-    }
-
-    if (!userId || !db) {
-      setState((s) => ({ ...s, loading: false }));
+    if (isAllowlistedUser || !userId || !db) {
       return;
     }
 
@@ -57,6 +53,7 @@ export function useSubscription(
           Date.now() < Date.parse(trialEndsAt);
 
         setState({
+          userId,
           isPro: data.isPro === true || isTrialActive,
           isTrialing: isTrialActive,
           trialEndsAt: trialEndsAt ?? null,
@@ -68,18 +65,42 @@ export function useSubscription(
         });
       } else {
         setState({
-          isPro: false,
-          isTrialing: false,
-          trialEndsAt: null,
-          stripeCustomerId: null,
-          subscriptionStatus: null,
+          ...defaultState,
+          userId,
           loading: false,
         });
       }
     });
 
     return () => unsubscribe();
-  }, [userId, userEmail]);
+  }, [isAllowlistedUser, userId]);
 
-  return state;
+  return useMemo(() => {
+    if (isAllowlistedUser) {
+      return {
+        isPro: true,
+        isTrialing: false,
+        trialEndsAt: null,
+        stripeCustomerId: null,
+        subscriptionStatus: "active",
+        loading: false,
+      };
+    }
+
+    if (!userId || !db) {
+      return {
+        ...defaultState,
+        loading: false,
+      };
+    }
+
+    if (state.userId !== userId) {
+      return {
+        ...defaultState,
+        loading: true,
+      };
+    }
+
+    return state;
+  }, [isAllowlistedUser, state, userId]);
 }

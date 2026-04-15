@@ -11,7 +11,7 @@ import {
   buildWorkoutTimerConfig,
   formatWorkoutTimerTime,
 } from "../../../shared/workoutTimer";
-import { useWorkoutTimer } from "../../../shared/useWorkoutTimer";
+import { useWorkoutTimer } from "../hooks/useWorkoutTimer";
 import { WorkoutTier } from "../types";
 
 interface WorkoutTimerProps {
