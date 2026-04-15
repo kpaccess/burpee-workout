@@ -118,7 +118,7 @@ export default function WorkoutTimer({
         </Box>
       ) : (
         <Typography variant="body2" color="text.secondary">
-          Beginner uses a simple 20-minute countdown.
+          Beginner paces at 1 rep every minute for 20 total reps.
         </Typography>
       )}
 

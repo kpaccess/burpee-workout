@@ -34,7 +34,7 @@ const PRO_FEATURES = [
 
 const BEGINNER_FEATURES = [
   "Beginner workout track",
-  "Free access with no billing",
+  "Included in 60-day launch free access",
   "Placeholder video area for your future content",
   "Core progress tracking",
 ];
@@ -141,7 +141,7 @@ export default function PricingPage() {
             Workout Tracks
           </Typography>
           <Typography variant="h6" color="grey.400">
-            Beginner is completely free. Only the advanced track has charges.
+            All users get 60-day launch free access from their start date.
           </Typography>
         </Box>
 
@@ -186,7 +186,7 @@ export default function PricingPage() {
                 </Typography>
               </Box>
               <Typography variant="body2" color="grey.400" sx={{ mb: 3 }}>
-                No charges now or later
+                Available during launch free period
               </Typography>
               <Divider sx={{ borderColor: "rgba(255,255,255,0.1)", mb: 3 }} />
               <List dense disablePadding>
@@ -446,8 +446,8 @@ export default function PricingPage() {
         >
           <LockIcon sx={{ color: "grey.600", fontSize: 18 }} />
           <Typography variant="body2" color="grey.500">
-            Beginner access remains free. Only advanced features and premium
-            content require a paid subscription.
+            Advanced features and premium content require a paid subscription
+            after your 60-day launch free access ends.
           </Typography>
         </Box>
       </Container>

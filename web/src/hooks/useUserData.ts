@@ -71,16 +71,27 @@ export function useUserData() {
   ) => {
     if (!user || !userData) return;
     const normalizedDate = toDateKey(dateStr);
-    const isBeginnerTrack = userData.workoutTier === "beginner";
+    const inferredTier =
+      userData.currentLevelId && /^B[1-6]$/.test(userData.currentLevelId)
+        ? "beginner"
+        : "advanced";
+    const effectiveTier = userData.workoutTier ?? inferredTier;
+    const isBeginnerTrack = effectiveTier === "beginner";
 
     // Create a deeper copy of logs to avoid read-only mutation issues
     const logs = [...(userData.workoutLogs || [])].map((log) => ({ ...log }));
     const idx = logs.findIndex((l) => toDateKey(l.date) === normalizedDate);
+    const beginnerLevelId =
+      isBeginnerTrack &&
+      typeof userData.currentLevelId === "string" &&
+      /^B[1-6]$/.test(userData.currentLevelId)
+        ? userData.currentLevelId
+        : "B1";
     const effectiveType = isBeginnerTrack ? "C" : type;
     const typeSuffix = effectiveType ? `(${effectiveType})` : "";
     const levelCompleted = completed
       ? isBeginnerTrack
-        ? "Beginner"
+        ? `${beginnerLevelId}(C)`
         : `${userData.currentLevelId || ""}${typeSuffix}`
       : null;
     const workoutType =

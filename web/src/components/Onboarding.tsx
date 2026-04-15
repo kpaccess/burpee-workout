@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import {
   Box,
   Button,
@@ -17,7 +17,7 @@ import {
 import PhotoCamera from "@mui/icons-material/PhotoCamera";
 import { motion } from "framer-motion";
 import Image from "next/image";
-import { LEVELS, WorkoutTier } from "../types";
+import { ADVANCED_LEVELS, BEGINNER_LEVELS, WorkoutTier } from "../types";
 import { useAuth } from "../context/AuthContext";
 
 interface OnboardingProps {
@@ -27,19 +27,25 @@ interface OnboardingProps {
     startPictureUrl: string | null;
     currentLevelId: string;
     workoutTier: WorkoutTier;
+    trialEndsAt: string;
   }) => void;
 }
 
 export default function Onboarding({ onComplete }: OnboardingProps) {
+  const FREE_ACCESS_DAYS = 60;
   const { user, logout } = useAuth();
   const [startDate, setStartDate] = useState(
     new Date().toISOString().split("T")[0],
   );
   const [weight, setWeight] = useState("");
   const [pictureUrl, setPictureUrl] = useState<string | null>(null);
-  const [level, setLevel] = useState("1B");
+  const [level, setLevel] = useState("B1");
   const [workoutTier, setWorkoutTier] = useState<WorkoutTier>("beginner");
   const isBeginnerTrack = workoutTier === "beginner";
+  const levelsForTier = useMemo(
+    () => (isBeginnerTrack ? BEGINNER_LEVELS : ADVANCED_LEVELS),
+    [isBeginnerTrack],
+  );
 
   const accountLabel =
     user?.email || (user ? `UID: ${user.uid}` : "Unknown account");
@@ -58,13 +64,17 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!weight) return;
+    const start = new Date(`${startDate}T00:00:00`);
+    const trialEnds = new Date(start);
+    trialEnds.setDate(trialEnds.getDate() + FREE_ACCESS_DAYS);
 
     onComplete({
       startDate,
       startWeight: parseFloat(weight),
       startPictureUrl: pictureUrl,
-      currentLevelId: isBeginnerTrack ? "1B" : level,
+      currentLevelId: level,
       workoutTier,
+      trialEndsAt: trialEnds.toISOString(),
     });
   };
 
@@ -90,7 +100,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
           color="primary"
           fontWeight={800}
         >
-          The Busy Dad Program
+          Busy People Program
         </Typography>
         <Typography
           variant="body1"
@@ -140,8 +150,8 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
           sx={{ mb: 3 }}
         >
           {workoutTier === "beginner"
-            ? "Beginner is completely free. No billing is required for this track."
-            : "Advanced is the paid track. You can subscribe after setup to unlock it."}
+            ? "You get 60-day free access from your start date. After that, advanced features require a subscription."
+            : "You get 60-day free access from your start date. After that, advanced features require a subscription."}
         </Alert>
 
         <form onSubmit={handleSubmit}>
@@ -171,10 +181,14 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
                 labelId="workout-tier-label"
                 value={workoutTier}
                 label="Workout Type"
-                onChange={(e) => setWorkoutTier(e.target.value as WorkoutTier)}
+                onChange={(e) => {
+                  const nextTier = e.target.value as WorkoutTier;
+                  setWorkoutTier(nextTier);
+                  setLevel(nextTier === "beginner" ? "B1" : "1B");
+                }}
               >
                 <MenuItem value="beginner">
-                  Beginner - free track with starter guidance
+                  Beginner - starter guidance and no-pushup progression
                 </MenuItem>
                 <MenuItem value="advanced">
                   Advanced - paid track with premium workouts
@@ -182,28 +196,21 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
               </Select>
             </FormControl>
 
-            {!isBeginnerTrack ? (
-              <FormControl fullWidth required>
-                <InputLabel id="level-label">Starting Level</InputLabel>
-                <Select
-                  labelId="level-label"
-                  value={level}
-                  label="Starting Level"
-                  onChange={(e) => setLevel(e.target.value)}
-                >
-                  {LEVELS.map((lvl) => (
-                    <MenuItem key={lvl.id} value={lvl.id}>
-                      {lvl.name} - {lvl.description}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            ) : (
-              <Alert severity="info">
-                Beginner uses one built-in workout option, so there is no level
-                selection here.
-              </Alert>
-            )}
+            <FormControl fullWidth required>
+              <InputLabel id="level-label">Starting Level</InputLabel>
+              <Select
+                labelId="level-label"
+                value={level}
+                label="Starting Level"
+                onChange={(e) => setLevel(e.target.value)}
+              >
+                {levelsForTier.map((lvl) => (
+                  <MenuItem key={lvl.id} value={lvl.id}>
+                    {lvl.name} - {lvl.description}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
 
             <Box
               sx={{

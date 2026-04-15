@@ -39,8 +39,8 @@ export function buildWorkoutTimerConfig({
           mode: "C",
           label: "Beginner Session",
           shortLabel: "B",
-          description: "One simple beginner workout",
-          goal: 0,
+          description: "1 rep every minute for 20 minutes",
+          goal: initialMinutes,
         },
       ],
     };

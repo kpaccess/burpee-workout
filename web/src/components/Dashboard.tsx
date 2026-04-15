@@ -20,7 +20,12 @@ import {
   Alert,
 } from "@mui/material";
 import PhotoCamera from "@mui/icons-material/PhotoCamera";
-import { UserData, LEVELS, WorkoutLog } from "../types";
+import {
+  ADVANCED_LEVELS,
+  BEGINNER_LEVELS,
+  UserData,
+  WorkoutLog,
+} from "../types";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   addMonths,
@@ -75,9 +80,18 @@ export default function Dashboard({
     anchorEl: HTMLElement;
     dateStr: string;
   } | null>(null);
-  const workoutTier = userData.workoutTier ?? "beginner";
+  const [dismissedAdvancedSuggestion, setDismissedAdvancedSuggestion] =
+    useState(false);
+  // Legacy users may not have workoutTier stored yet; keep them on advanced
+  // unless they are clearly on a beginner B-level.
+  const inferredTier =
+    userData.currentLevelId && /^B[1-6]$/.test(userData.currentLevelId)
+      ? "beginner"
+      : "advanced";
+  const workoutTier = userData.workoutTier ?? inferredTier;
   const isAdvancedTrack = workoutTier === "advanced";
   const isBeginnerTrack = !isAdvancedTrack;
+  const levelsForTrack = isAdvancedTrack ? ADVANCED_LEVELS : BEGINNER_LEVELS;
 
   const startDate = new Date(userData.startDate);
   const milestoneDate = addMonths(startDate, 6);
@@ -139,10 +153,40 @@ export default function Dashboard({
     return null;
   };
 
+  const formatWorkoutLogLabel = (levelCompleted?: string): string | null => {
+    if (!levelCompleted) return null;
+
+    const beginnerMatch = levelCompleted.match(/^B([1-6])\(C\)$/);
+    if (beginnerMatch) {
+      return `Beginner ${beginnerMatch[1]}`;
+    }
+
+    // Backward-compatible display for older beginner logs saved before B-levels.
+    if (isBeginnerTrack && levelCompleted === "1B(C)") {
+      return "Beginner 1";
+    }
+
+    const advancedMatch = levelCompleted.match(/^([0-9A-Za-z]+)\(([NC])\)$/);
+    if (advancedMatch) {
+      const [, levelId, mode] = advancedMatch;
+      return `${levelId}(${mode})`;
+    }
+
+    return levelCompleted;
+  };
+
   const day1PictureUrl =
     userData.startPictureUrl ||
     (userData as UserData & { startPictureURl?: string }).startPictureURl ||
     null;
+  const currentLevel = userData.currentLevelId
+    ? levelsForTrack.find((l) => l.id === userData.currentLevelId) ?? null
+    : null;
+  const hasCompletedB6 = (userData.workoutLogs ?? []).some(
+    (log) => log.completed && (log.levelCompleted ?? "").startsWith("B6"),
+  );
+  const shouldShowAdvancedSuggestion =
+    isBeginnerTrack && hasCompletedB6 && !dismissedAdvancedSuggestion;
 
   return (
     <Box sx={{ p: { xs: 2, md: 4 }, maxWidth: 1200, mx: "auto" }}>
@@ -168,7 +212,7 @@ export default function Dashboard({
               My Burpee Journey
             </Typography>
             <Typography variant="subtitle1" color="text.secondary">
-              Day {Math.max(0, daysPassed)} • The Busy Dad Program
+              Day {Math.max(0, daysPassed)} • Busy People Program
             </Typography>
           </Box>
           <Box>
@@ -216,6 +260,47 @@ export default function Dashboard({
             </motion.div>
           )}
         </AnimatePresence>
+
+        {shouldShowAdvancedSuggestion && (
+          <Card
+            sx={{
+              p: 3,
+              mb: 3,
+              border: "1px solid rgba(255, 193, 7, 0.45)",
+              background: "rgba(255, 193, 7, 0.08)",
+            }}
+          >
+            <Typography variant="h6" color="warning.main" gutterBottom>
+              Nice work - you completed Beginner B6
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              You are ready for the Advanced track. Want to move to Level 1B and
+              keep progressing?
+            </Typography>
+            <Box display="flex" gap={1.5} flexWrap="wrap">
+              <Button
+                variant="contained"
+                color="warning"
+                onClick={() => {
+                  if (!onUpdateData) return;
+                  onUpdateData({
+                    workoutTier: "advanced",
+                    currentLevelId: "1B",
+                  });
+                  setDismissedAdvancedSuggestion(true);
+                }}
+              >
+                Switch to Advanced (1B)
+              </Button>
+              <Button
+                variant="text"
+                onClick={() => setDismissedAdvancedSuggestion(true)}
+              >
+                Maybe later
+              </Button>
+            </Box>
+          </Card>
+        )}
 
         {/* Stats and Video Row */}
         <Grid container spacing={3} mb={4}>
@@ -280,10 +365,7 @@ export default function Dashboard({
                       fontWeight="bold"
                     >
                       Current:{" "}
-                      {userData.currentLevelId
-                        ? LEVELS.find((l) => l.id === userData.currentLevelId)
-                            ?.name
-                        : "Not set"}
+                      {currentLevel?.name ?? "Not set"}
                     </Typography>
                     <Button
                       variant="outlined"
@@ -294,14 +376,22 @@ export default function Dashboard({
                     </Button>
                   </Box>
                 ) : (
-                  <Typography
-                    variant="body1"
-                    color="primary"
-                    fontWeight="bold"
-                    mb={1}
-                  >
-                    Beginner session only
-                  </Typography>
+                  <Box display="flex" alignItems="center" gap={2} mb={1}>
+                    <Typography
+                      variant="body1"
+                      color="primary"
+                      fontWeight="bold"
+                    >
+                      Current: {currentLevel?.name ?? "Not set"}
+                    </Typography>
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      onClick={() => setOpenLevelChange(true)}
+                    >
+                      {userData.currentLevelId ? "Update" : "Set Level"}
+                    </Button>
+                  </Box>
                 )}
                 <Typography variant="body2" color="text.secondary">
                   Start Date: {startDate.toLocaleDateString()}
@@ -321,7 +411,7 @@ export default function Dashboard({
                         ? isPro
                           ? "Advanced track active"
                           : "Advanced track selected"
-                        : "Beginner track free forever"
+                        : "Beginner track selected"
                     }
                     color={isAdvancedTrack ? "primary" : "secondary"}
                     sx={{ fontWeight: 700 }}
@@ -357,16 +447,10 @@ export default function Dashboard({
             <WorkoutTimer
               tier={workoutTier}
               sealsGoal={
-                userData.currentLevelId
-                  ? LEVELS.find((entry) => entry.id === userData.currentLevelId)
-                      ?.seals
-                  : 0
+                currentLevel?.seals ?? 0
               }
               sixCountsGoal={
-                userData.currentLevelId
-                  ? LEVELS.find((entry) => entry.id === userData.currentLevelId)
-                      ?.sixCounts
-                  : 0
+                currentLevel?.sixCounts ?? 0
               }
               onOpenVideo={() => setOpenVideo(true)}
             />
@@ -507,7 +591,7 @@ export default function Dashboard({
                           }}
                           align="center"
                         >
-                          {dayLog.levelCompleted}
+                          {formatWorkoutLogLabel(dayLog.levelCompleted)}
                         </Typography>
                       )}
                     </Box>
@@ -613,42 +697,35 @@ export default function Dashboard({
           </Grid>
         </Grid>
 
-        {isAdvancedTrack && (
-          <>
-            <Typography
-              variant="h5"
-              fontWeight={700}
-              gutterBottom
-              mt={4}
-              mb={2}
-            >
-              Program Levels
-            </Typography>
-            <Grid container spacing={2}>
-              {LEVELS.map((lvl) => (
-                <Grid sx={{ xs: 12, sm: 6, md: 3 }} key={lvl.id}>
-                  <Card
-                    sx={{
-                      p: 3,
-                      transition: "0.3s",
-                      border:
-                        userData.currentLevelId === lvl.id
-                          ? "2px solid #FF3366"
-                          : "1px solid transparent",
-                      "&:hover": {
-                        transform: "translateY(-5px)",
-                        borderColor: "secondary.main",
-                      },
-                    }}
-                  >
-                    <Typography variant="h6" color="secondary" gutterBottom>
-                      {lvl.name}{" "}
-                      {userData.currentLevelId === lvl.id && "(Current)"}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      {lvl.description}
-                    </Typography>
-                    {lvl.seals > 0 && (
+        <>
+          <Typography variant="h5" fontWeight={700} gutterBottom mt={4} mb={2}>
+            Program Levels
+          </Typography>
+          <Grid container spacing={2}>
+            {levelsForTrack.map((lvl) => (
+              <Grid sx={{ xs: 12, sm: 6, md: 3 }} key={lvl.id}>
+                <Card
+                  sx={{
+                    p: 3,
+                    transition: "0.3s",
+                    border:
+                      userData.currentLevelId === lvl.id
+                        ? "2px solid #FF3366"
+                        : "1px solid transparent",
+                    "&:hover": {
+                      transform: "translateY(-5px)",
+                      borderColor: "secondary.main",
+                    },
+                  }}
+                >
+                  <Typography variant="h6" color="secondary" gutterBottom>
+                    {lvl.name} {userData.currentLevelId === lvl.id && "(Current)"}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    {lvl.description}
+                  </Typography>
+                  {isAdvancedTrack ? (
+                    lvl.seals > 0 && (
                       <Box mt={2} display="flex" gap={1}>
                         <Chip
                           label={`${lvl.seals} Seals`}
@@ -661,58 +738,62 @@ export default function Dashboard({
                           variant="outlined"
                         />
                       </Box>
-                    )}
-                  </Card>
-                </Grid>
-              ))}
-            </Grid>
-          </>
-        )}
+                    )
+                  ) : (
+                    <Box mt={2} display="flex" gap={1}>
+                      <Chip
+                        label={`${lvl.sixCounts} Burpees (no pushups)`}
+                        size="small"
+                        variant="outlined"
+                      />
+                    </Box>
+                  )}
+                </Card>
+              </Grid>
+            ))}
+          </Grid>
+        </>
 
         {/* Update Level Dialog */}
-        {isAdvancedTrack && (
-          <Dialog
-            open={openLevelChange}
-            onClose={() => setOpenLevelChange(false)}
-            maxWidth="sm"
-            fullWidth
-          >
-            <DialogTitle>Update Current Level</DialogTitle>
-            <DialogContent>
-              <Typography variant="body2" color="text.secondary" mb={3}>
-                Have you progressed or want to scale back? Select your new
-                active level.
-              </Typography>
-              <FormControl fullWidth>
-                <InputLabel id="change-level-label">Level</InputLabel>
-                <Select
-                  labelId="change-level-label"
-                  value={newLevel}
-                  label="Level"
-                  onChange={(e) => setNewLevel(e.target.value)}
-                >
-                  {LEVELS.map((lvl) => (
-                    <MenuItem key={lvl.id} value={lvl.id}>
-                      {lvl.name} - {lvl.description}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-              <Box mt={3} display="flex" justifyContent="flex-end" gap={2}>
-                <Button onClick={() => setOpenLevelChange(false)}>
-                  Cancel
-                </Button>
-                <Button
-                  variant="contained"
-                  color="primary"
-                  onClick={handleChangeLevel}
-                >
-                  Save Level
-                </Button>
-              </Box>
-            </DialogContent>
-          </Dialog>
-        )}
+        <Dialog
+          open={openLevelChange}
+          onClose={() => setOpenLevelChange(false)}
+          maxWidth="sm"
+          fullWidth
+        >
+          <DialogTitle>Update Current Level</DialogTitle>
+          <DialogContent>
+            <Typography variant="body2" color="text.secondary" mb={3}>
+              Have you progressed or want to scale back? Select your new active
+              level.
+            </Typography>
+            <FormControl fullWidth>
+              <InputLabel id="change-level-label">Level</InputLabel>
+              <Select
+                labelId="change-level-label"
+                value={newLevel}
+                label="Level"
+                onChange={(e) => setNewLevel(e.target.value)}
+              >
+                {levelsForTrack.map((lvl) => (
+                  <MenuItem key={lvl.id} value={lvl.id}>
+                    {lvl.name} - {lvl.description}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <Box mt={3} display="flex" justifyContent="flex-end" gap={2}>
+              <Button onClick={() => setOpenLevelChange(false)}>Cancel</Button>
+              <Button
+                variant="contained"
+                color="primary"
+                onClick={handleChangeLevel}
+              >
+                Save Level
+              </Button>
+            </Box>
+          </DialogContent>
+        </Dialog>
 
         {/* Video Dialog */}
         <Dialog
@@ -731,27 +812,21 @@ export default function Dashboard({
               {!isAdvancedTrack && (
                 <Card sx={{ p: 3, border: "1px dashed rgba(255,255,255,0.2)" }}>
                   <Typography variant="subtitle1" mb={1} fontWeight="bold">
-                    Beginner Video Placeholder
+                    Beginner Burpee Demo
                   </Typography>
                   <Typography variant="body2" color="text.secondary" mb={2}>
-                    Add your beginner walkthrough video here later. This section
-                    stays free for all beginner users.
+                    Simple no-pushup burpee demo. Keep this as your baseline
+                    movement for Beginner levels.
                   </Typography>
-                  <Box
-                    sx={{
-                      borderRadius: 2,
-                      minHeight: 220,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      background:
-                        "linear-gradient(135deg, rgba(0,229,255,0.08), rgba(255,255,255,0.04))",
-                    }}
+                  <Button
+                    variant="contained"
+                    component="a"
+                    href="https://www.youtube.com/shorts/O9E5BSf2l1Q"
+                    target="_blank"
+                    rel="noreferrer"
                   >
-                    <Typography variant="body1" color="text.secondary">
-                      Video placeholder
-                    </Typography>
-                  </Box>
+                    Watch beginner video
+                  </Button>
                 </Card>
               )}
 
@@ -792,8 +867,8 @@ export default function Dashboard({
                     Advanced videos are paid
                   </Typography>
                   <Typography variant="body2" color="text.secondary" mb={2}>
-                    Beginner stays free. Subscribe to unlock the advanced
-                    tutorial library and premium training content.
+                    Your launch free period is active for 60 days from start.
+                    Subscribe to keep advanced tutorial access afterward.
                   </Typography>
                   <Button
                     variant="contained"

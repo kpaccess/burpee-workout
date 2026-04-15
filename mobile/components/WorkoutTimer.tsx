@@ -175,7 +175,7 @@ export const WorkoutTimer: React.FC<WorkoutTimerProps> = ({
             )}
           </View>
         ) : (
-          <Text style={styles.label}>Simple countdown</Text>
+          <Text style={styles.label}>1 rep every minute</Text>
         )}
       </Animated.View>
       <View style={styles.controls}>

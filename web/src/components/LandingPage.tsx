@@ -69,9 +69,9 @@ export default function LandingPage() {
               color="text.secondary"
               sx={{ maxWidth: 760 }}
             >
-              Choose a completely free beginner track or unlock the paid
-              advanced track. Both are built around simple, consistent burpee
-              training.
+              Start with 60-day free access for all users, then continue with
+              the plan that fits you. Both tracks are built around simple,
+              consistent burpee training.
             </Typography>
             <Typography
               variant="body1"
@@ -117,7 +117,7 @@ export default function LandingPage() {
                 startIcon={<WorkspacePremiumIcon />}
                 onClick={() => router.push("/login")}
               >
-                Start Beginner Free
+                Start 60-Day Free Access
               </Button>
               <Button
                 variant="outlined"
@@ -198,11 +198,12 @@ export default function LandingPage() {
             less, and your results improve month after month.
           </Typography>
           <Typography variant="body1" color="text.secondary" mb={2}>
-            BurpeePacer Pro is built for this exact goal: track every workout,
-            keep your streak visible, and stay accountable to your plan.
+            Many people plan to walk outside, but weather changes - rain, cold,
+            or darkness can break the routine. Burpees at home remove that
+            barrier. No equipment, little space, anytime in 20 minutes.
           </Typography>
           <Chip
-            label="Beginner is free forever"
+            label="60-day launch free access"
             sx={{
               mb: 2.5,
               bgcolor: "rgba(0,229,255,0.12)",
@@ -263,7 +264,7 @@ export default function LandingPage() {
           </Box>
           <Stack direction={{ xs: "column", sm: "row" }} spacing={1.2}>
             <Chip label="Follow the schedule" color="secondary" />
-            <Chip label="Beginner stays free" color="primary" />
+            <Chip label="60-day launch free access" color="primary" />
             <Chip
               label="Advanced unlocks premium coaching"
               sx={{ bgcolor: "rgba(255,255,255,0.1)", color: "white" }}
@@ -289,8 +290,8 @@ export default function LandingPage() {
               Beginner
             </Typography>
             <Typography variant="body1" color="text.secondary" mb={1}>
-              Free forever. Use it to build consistency, learn the movement, and
-              add your starter video later.
+              Included in your 60-day launch free access. Use it to build
+              consistency and learn movement quality.
             </Typography>
             <Typography variant="body2" color="text.secondary">
               Best for people starting out or anyone who wants a no-cost entry
@@ -343,6 +344,15 @@ export default function LandingPage() {
               <Typography variant="body1" color="text.secondary" mb={2.5}>
                 Good choice when your goal is consistency and daily completion.
               </Typography>
+              <Button
+                variant="outlined"
+                component="a"
+                href="https://www.youtube.com/shorts/O9E5BSf2l1Q"
+                target="_blank"
+                rel="noreferrer"
+              >
+                Watch simple demo
+              </Button>
             </Card>
           </Grid>
           <Grid sx={{ xs: 12, md: 6 }}>
