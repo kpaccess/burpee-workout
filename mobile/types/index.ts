@@ -33,7 +33,7 @@ export interface LevelDescription {
   timeLimitMintues: number;
 }
 
-export const LEVELS: LevelDescription[] = [
+export const ADVANCED_LEVELS: LevelDescription[] = [
   {
     id: "1A",
     name: "Level 1A",
@@ -99,3 +99,56 @@ export const LEVELS: LevelDescription[] = [
     timeLimitMintues: 20,
   },
 ];
+
+export const BEGINNER_LEVELS: LevelDescription[] = [
+  {
+    id: "B1",
+    name: "Beginner 1",
+    description: "25 burpees (no pushups) in 20 min.",
+    seals: 0,
+    sixCounts: 25,
+    timeLimitMintues: 20,
+  },
+  {
+    id: "B2",
+    name: "Beginner 2",
+    description: "40 burpees (no pushups) in 20 min.",
+    seals: 0,
+    sixCounts: 40,
+    timeLimitMintues: 20,
+  },
+  {
+    id: "B3",
+    name: "Beginner 3",
+    description: "55 burpees (no pushups) in 20 min.",
+    seals: 0,
+    sixCounts: 55,
+    timeLimitMintues: 20,
+  },
+  {
+    id: "B4",
+    name: "Beginner 4",
+    description: "70 burpees (no pushups) in 20 min.",
+    seals: 0,
+    sixCounts: 70,
+    timeLimitMintues: 20,
+  },
+  {
+    id: "B5",
+    name: "Beginner 5",
+    description: "90 burpees (no pushups) in 20 min.",
+    seals: 0,
+    sixCounts: 90,
+    timeLimitMintues: 20,
+  },
+  {
+    id: "B6",
+    name: "Beginner 6",
+    description: "110 burpees (no pushups) in 20 min.",
+    seals: 0,
+    sixCounts: 110,
+    timeLimitMintues: 20,
+  },
+];
+
+export const LEVELS: LevelDescription[] = ADVANCED_LEVELS;

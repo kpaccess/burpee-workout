@@ -16,7 +16,6 @@ import {
   differenceInDays,
   addMonths,
   isAfter,
-  subDays,
   format,
   startOfMonth,
   endOfMonth,
@@ -39,7 +38,13 @@ import * as Haptics from "expo-haptics";
 import { Ionicons } from "@expo/vector-icons";
 import { auth } from "../../lib/firebase";
 import { getUserData, saveUserDataDB } from "../../lib/db";
-import { UserData, LEVELS, WorkoutLog, WorkoutTier } from "../../types";
+import {
+  ADVANCED_LEVELS,
+  BEGINNER_LEVELS,
+  UserData,
+  WorkoutLog,
+  WorkoutTier,
+} from "../../types";
 import { WorkoutTimer } from "../../components/WorkoutTimer";
 
 export default function HomeScreen() {
@@ -49,6 +54,7 @@ export default function HomeScreen() {
 
   // Auth Forms
   const [isLoginFlow, setIsLoginFlow] = useState(true);
+  const [showAuthForm, setShowAuthForm] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [authError, setAuthError] = useState("");
@@ -110,6 +116,12 @@ export default function HomeScreen() {
     }
   };
 
+  const openAuthForm = (mode: "login" | "signup") => {
+    setIsLoginFlow(mode === "login");
+    setAuthError("");
+    setShowAuthForm(true);
+  };
+
   const startProgram = async () => {
     if (!weight || !user) return;
     const isBeginnerTrack = selectedWorkoutTier === "beginner";
@@ -117,7 +129,7 @@ export default function HomeScreen() {
       startDate: date,
       startWeight: parseFloat(weight),
       startPictureUrl: day1PictureDraft,
-      currentLevelId: isBeginnerTrack ? "1B" : selectedLevelId,
+      currentLevelId: isBeginnerTrack ? "B1" : selectedLevelId,
       workoutTier: selectedWorkoutTier,
       workoutLogs: [],
     };
@@ -210,6 +222,18 @@ export default function HomeScreen() {
   const toDateKey = (input: Date | string) =>
     format(new Date(input), "yyyy-MM-dd");
 
+  const inferWorkoutTier = (
+    data: Pick<UserData, "workoutTier" | "currentLevelId">,
+  ): WorkoutTier => {
+    if (data.workoutTier) {
+      return data.workoutTier;
+    }
+
+    return data.currentLevelId && /^B[1-6]$/.test(data.currentLevelId)
+      ? "beginner"
+      : "advanced";
+  };
+
   const getWorkoutLogForDate = (dateStr: string): WorkoutLog | null => {
     if (!userData?.workoutLogs?.length) return null;
     const key = toDateKey(dateStr);
@@ -219,6 +243,28 @@ export default function HomeScreen() {
       }
     }
     return null;
+  };
+
+  const formatWorkoutLogLabel = (levelCompleted?: string): string | null => {
+    if (!levelCompleted) return null;
+
+    const beginnerMatch = levelCompleted.match(/^B([1-6])\(C\)$/);
+    if (beginnerMatch) {
+      return `B${beginnerMatch[1]}`;
+    }
+
+    // Backward-compatible display for older beginner logs
+    if (levelCompleted === "1B(C)") {
+      return "B1";
+    }
+
+    const advancedMatch = levelCompleted.match(/^([0-9A-Za-z]+)\(([NC])\)$/);
+    if (advancedMatch) {
+      const [, levelId, mode] = advancedMatch;
+      return `${levelId}(${mode})`;
+    }
+
+    return levelCompleted;
   };
 
   const updateLevel = async (levelId: string) => {
@@ -245,11 +291,27 @@ export default function HomeScreen() {
     const key = toDateKey(dateStr);
     const logs = [...(userData.workoutLogs || [])];
     const idx = logs.findIndex((l) => toDateKey(l.date) === key);
-    const isBeginnerTrack = (userData.workoutTier ?? "beginner") === "beginner";
-    const currentLevelId = isBeginnerTrack
-      ? "Beginner"
-      : userData.currentLevelId || undefined;
+    const workoutTier = inferWorkoutTier(userData);
+    const isBeginnerTrack = workoutTier === "beginner";
     const effectiveType = isBeginnerTrack ? "C" : type;
+    const typeSuffix = effectiveType ? `(${effectiveType})` : "";
+    const beginnerLevelId =
+      isBeginnerTrack &&
+      typeof userData.currentLevelId === "string" &&
+      /^B[1-6]$/.test(userData.currentLevelId)
+        ? userData.currentLevelId
+        : "B1";
+    const levelCompleted = completed
+      ? isBeginnerTrack
+        ? `${beginnerLevelId}(C)`
+        : `${userData.currentLevelId || ""}${typeSuffix}`
+      : undefined;
+    const workoutType =
+      effectiveType === "N"
+        ? "with_pushups"
+        : effectiveType === "C"
+          ? "no_pushups"
+          : undefined;
 
     if (idx >= 0) {
       if (!completed) {
@@ -264,16 +326,16 @@ export default function HomeScreen() {
         logs[idx] = {
           ...logs[idx],
           completed: true,
-          levelCompleted: currentLevelId,
-          workoutType: effectiveType,
+          levelCompleted,
+          workoutType,
         };
       }
     } else if (completed) {
       logs.push({
         date: key,
         completed: true,
-        levelCompleted: currentLevelId,
-        workoutType: effectiveType,
+        levelCompleted,
+        workoutType,
       });
     }
 
@@ -332,12 +394,107 @@ export default function HomeScreen() {
 
   // --- 1. NOT AUTHENTICATED: Show Login Screen ---
   if (!user) {
+    if (!showAuthForm) {
+      return (
+        <SafeAreaView style={styles.container}>
+          <ScrollView contentContainerStyle={styles.landingScrollContent}>
+            <View style={styles.landingHero}>
+              <View style={styles.landingBadge}>
+                <Ionicons name="barbell-outline" size={16} color="#fff" />
+                <Text style={styles.landingBadgeText}>BurpeePacer</Text>
+              </View>
+
+              <Text style={styles.landingTitle}>
+                Burpees: Simple, Brutal, and Proven
+              </Text>
+              <Text style={styles.landingSubtitle}>
+                Start with free access, follow the schedule, and build progress
+                with a clear beginner or advanced track.
+              </Text>
+
+              <View style={styles.attributionBox}>
+                <Text style={styles.attributionTitle}>
+                  Inspired by the Busy Dad Program by Busy Dad Training.
+                </Text>
+                <Text style={styles.attributionText}>
+                  This app is an independent project and is not affiliated with
+                  or endorsed by Busy Dad Training.
+                </Text>
+              </View>
+
+              <TouchableOpacity
+                style={styles.primaryActionBtn}
+                onPress={() => openAuthForm("signup")}
+              >
+                <Text style={styles.primaryActionBtnText}>
+                  Start 60-Day Free Access
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.secondaryActionBtn, styles.landingSecondaryBtn]}
+                onPress={() =>
+                  Linking.openURL("https://burpeepacer.com/pricing")
+                }
+              >
+                <Text style={styles.secondaryActionBtnText}>
+                  See Advanced Pricing
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => openAuthForm("login")}
+                style={styles.landingTextAction}
+              >
+                <Text style={styles.landingTextActionLabel}>
+                  Already a member? Sign in
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.landingInfoCard}>
+              <Text style={styles.landingInfoTitle}>Why Burpees Work</Text>
+              <Text style={styles.landingInfoText}>
+                Burpees train legs, core, chest, shoulders, and lungs in one
+                short session with no equipment.
+              </Text>
+              <Text style={styles.landingInfoText}>
+                The real advantage is consistency. Training at home removes the
+                friction that breaks routines.
+              </Text>
+            </View>
+
+            <View style={styles.landingInfoCard}>
+              <Text style={styles.landingInfoTitle}>Weekly Rhythm</Text>
+              <Text style={styles.landingInfoText}>
+                A simple example schedule is Mon, Tue, Thu, Fri for training,
+                with recovery on the other days.
+              </Text>
+              <Text style={styles.landingInfoText}>
+                Stay on schedule and the results compound.
+              </Text>
+            </View>
+          </ScrollView>
+        </SafeAreaView>
+      );
+    }
+
     return (
       <SafeAreaView style={styles.container}>
         <ScrollView
           contentContainerStyle={{ flexGrow: 1, justifyContent: "center" }}
         >
           <View style={styles.card}>
+            <TouchableOpacity
+              onPress={() => {
+                setShowAuthForm(false);
+                setAuthError("");
+              }}
+              style={styles.authBackBtn}
+            >
+              <Ionicons name="chevron-back" size={18} color="#fff" />
+              <Text style={styles.authBackBtnText}>Back</Text>
+            </TouchableOpacity>
             <Text style={styles.title}>
               {isLoginFlow ? "Welcome Back" : "Create Account"}
             </Text>
@@ -545,7 +702,7 @@ export default function HomeScreen() {
                   showsHorizontalScrollIndicator={false}
                   style={{ marginBottom: 14 }}
                 >
-                  {LEVELS.map((lvl) => {
+                  {ADVANCED_LEVELS.map((lvl) => {
                     const selected = selectedLevelId === lvl.id;
                     return (
                       <TouchableOpacity
@@ -588,9 +745,10 @@ export default function HomeScreen() {
       </SafeAreaView>
     );
   }
-  const workoutTier = userData.workoutTier ?? "beginner";
-  const isBeginnerTrack = workoutTier === "beginner";
-  const isAdvancedTrack = !isBeginnerTrack;
+  const workoutTier = inferWorkoutTier(userData);
+  const isAdvancedTrack = workoutTier === "advanced";
+  const isBeginnerTrack = !isAdvancedTrack;
+  const levelsForTrack = isAdvancedTrack ? ADVANCED_LEVELS : BEGINNER_LEVELS;
 
   // --- 3. AUTHENTICATED WITH DATA: Show Dashboard ---
   const startDate = new Date(userData.startDate);
@@ -601,7 +759,7 @@ export default function HomeScreen() {
     isAfter(new Date(), milestoneDate) && !userData.endDate;
 
   const currentLevelObj = userData.currentLevelId
-    ? LEVELS.find((l) => l.id === userData.currentLevelId)
+    ? levelsForTrack.find((l) => l.id === userData.currentLevelId)
     : null;
 
   // Generate Calendar Data
@@ -669,7 +827,7 @@ export default function HomeScreen() {
                 Overview
               </Text>
             </View>
-            {isAdvancedTrack && currentLevelObj && (
+            {currentLevelObj && (
               <View style={styles.currentLevelBadge}>
                 <Text style={styles.currentLevelBadgeText}>
                   {currentLevelObj.name}
@@ -693,6 +851,20 @@ export default function HomeScreen() {
               </Text>
             </View>
           </View>
+
+          {currentLevelObj && (
+            <View style={[styles.milestoneCountdown, { marginTop: 15 }]}>
+              <Ionicons
+                name="flag-outline"
+                size={16}
+                color="#00E5FF"
+                style={{ marginRight: 6 }}
+              />
+              <Text style={styles.milestoneCountdownText}>
+                Current level: {currentLevelObj.name}
+              </Text>
+            </View>
+          )}
 
           <View style={[styles.milestoneCountdown, { marginTop: 15 }]}>
             <Ionicons
@@ -721,34 +893,6 @@ export default function HomeScreen() {
               <Text style={styles.milestoneCountdownText}>
                 {daysToMilestone} days until 6-month check-in
               </Text>
-            </View>
-          )}
-
-          {userData.endDate && (
-            <View
-              style={[
-                styles.statsRow,
-                {
-                  marginTop: 15,
-                  borderTopWidth: 1,
-                  borderTopColor: "#222",
-                  paddingTop: 15,
-                },
-              ]}
-            >
-              <View style={styles.statBox}>
-                <Text style={styles.statLabel}>Milestone Date</Text>
-                <Text style={styles.statValue}>
-                  {format(new Date(userData.endDate), "MMM d, yyyy")}
-                </Text>
-              </View>
-              <View style={styles.statBox}>
-                <Text style={styles.statLabel}>New Weight</Text>
-                <Text style={styles.statValue}>
-                  {userData.endWeight}{" "}
-                  <Text style={{ fontSize: 12 }}>kg/lbs</Text>
-                </Text>
-              </View>
             </View>
           )}
         </View>
@@ -853,7 +997,7 @@ export default function HomeScreen() {
                     {isDone && (
                       <View style={styles.calendarDoneMarker}>
                         <Text style={styles.calendarDoneType}>
-                          {dayLog?.workoutType || "W"}
+                          {formatWorkoutLogLabel(dayLog?.levelCompleted) || "W"}
                         </Text>
                       </View>
                     )}
@@ -962,51 +1106,51 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        {isAdvancedTrack && (
-          <>
-            <Text style={[styles.sectionTitle, { marginTop: 30 }]}>
-              My Level
-            </Text>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              style={{ marginBottom: 12 }}
-            >
-              {LEVELS.map((lvl) => {
-                const isCurrent = userData.currentLevelId === lvl.id;
-                return (
-                  <TouchableOpacity
-                    key={`level-select-${lvl.id}`}
-                    style={[
-                      styles.levelPill,
-                      isCurrent && styles.levelPillSelected,
-                    ]}
-                    onPress={() => updateLevel(lvl.id)}
-                  >
-                    <Text
-                      style={[
-                        styles.levelPillText,
-                        isCurrent && styles.levelPillTextSelected,
-                      ]}
-                    >
-                      {lvl.name}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-            {currentLevelObj && (
-              <View style={styles.levelCard}>
-                <Text style={styles.levelTitle}>
-                  {currentLevelObj.name} (Active)
-                </Text>
-                <Text style={styles.levelDesc}>
-                  {currentLevelObj.description}
-                </Text>
-              </View>
-            )}
-          </>
+        {currentLevelObj && (
+          <View style={{ marginTop: 30 }}>
+            <Text style={styles.sectionTitle}>Current Level</Text>
+            <View style={styles.levelCard}>
+              <Text style={styles.levelTitle}>
+                {currentLevelObj.name} (Active)
+              </Text>
+              <Text style={styles.levelDesc}>
+                {currentLevelObj.description}
+              </Text>
+            </View>
+          </View>
         )}
+
+        <>
+          <Text style={[styles.sectionTitle, { marginTop: 30 }]}>My Level</Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={{ marginBottom: 12 }}
+          >
+            {levelsForTrack.map((lvl) => {
+              const isCurrent = userData.currentLevelId === lvl.id;
+              return (
+                <TouchableOpacity
+                  key={`level-select-${lvl.id}`}
+                  style={[
+                    styles.levelPill,
+                    isCurrent && styles.levelPillSelected,
+                  ]}
+                  onPress={() => updateLevel(lvl.id)}
+                >
+                  <Text
+                    style={[
+                      styles.levelPillText,
+                      isCurrent && styles.levelPillTextSelected,
+                    ]}
+                  >
+                    {lvl.name}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </>
 
         <TouchableOpacity
           style={[
@@ -1203,6 +1347,78 @@ const styles = StyleSheet.create({
     backgroundColor: "#060606",
   },
   container: { flex: 1, backgroundColor: "#060606" },
+  landingScrollContent: {
+    padding: 20,
+    paddingBottom: 36,
+  },
+  landingHero: {
+    paddingTop: 16,
+    marginBottom: 24,
+  },
+  landingBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-start",
+    gap: 8,
+    backgroundColor: "rgba(255,255,255,0.08)",
+    borderColor: "rgba(255,255,255,0.16)",
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginBottom: 18,
+  },
+  landingBadgeText: {
+    color: "#fff",
+    fontWeight: "800",
+    fontSize: 13,
+  },
+  landingTitle: {
+    color: "#fff",
+    fontSize: 36,
+    lineHeight: 40,
+    fontWeight: "900",
+    letterSpacing: -1.2,
+    marginBottom: 12,
+  },
+  landingSubtitle: {
+    color: "#bbb",
+    fontSize: 16,
+    lineHeight: 24,
+    marginBottom: 20,
+  },
+  landingSecondaryBtn: {
+    marginTop: 12,
+  },
+  landingTextAction: {
+    marginTop: 18,
+    alignItems: "center",
+  },
+  landingTextActionLabel: {
+    color: "#00E5FF",
+    fontWeight: "700",
+    fontSize: 14,
+  },
+  landingInfoCard: {
+    backgroundColor: "#111",
+    borderColor: "#222",
+    borderWidth: 1,
+    borderRadius: 24,
+    padding: 20,
+    marginBottom: 14,
+  },
+  landingInfoTitle: {
+    color: "#fff",
+    fontSize: 18,
+    fontWeight: "900",
+    marginBottom: 10,
+  },
+  landingInfoText: {
+    color: "#999",
+    fontSize: 14,
+    lineHeight: 21,
+    marginBottom: 8,
+  },
   card: {
     padding: 24,
     margin: 4,
@@ -1217,6 +1433,18 @@ const styles = StyleSheet.create({
     color: "#FF3366",
     marginBottom: 8,
     textAlign: "center",
+  },
+  authBackBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-start",
+    marginBottom: 18,
+    gap: 4,
+  },
+  authBackBtnText: {
+    color: "#fff",
+    fontWeight: "700",
+    fontSize: 14,
   },
   subtitle: {
     fontSize: 16,

@@ -8,12 +8,12 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import { Audio } from "expo-av";
+import { useAudioPlayer } from "expo-audio";
 import {
   buildWorkoutTimerConfig,
   formatWorkoutTimerTime,
-} from "../../shared/workoutTimer";
-import { useWorkoutTimer } from "../../shared/useWorkoutTimer";
+} from "../lib/workoutTimer";
+import { useWorkoutTimer } from "../hooks/useWorkoutTimer";
 import { WorkoutTier } from "../types";
 
 interface WorkoutTimerProps {
@@ -32,7 +32,13 @@ export const WorkoutTimer: React.FC<WorkoutTimerProps> = ({
   sixCountsGoal = 0,
 }) => {
   const pulseAnim = useRef(new Animated.Value(1)).current;
-  const soundRef = useRef<Audio.Sound | null>(null);
+  const beepPlayer = useAudioPlayer(
+    "https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3",
+    {
+      downloadFirst: true,
+      keepAudioSessionActive: true,
+    },
+  );
   const timerConfig = useMemo(
     () =>
       buildWorkoutTimerConfig({
@@ -66,30 +72,13 @@ export const WorkoutTimer: React.FC<WorkoutTimerProps> = ({
   });
 
   useEffect(() => {
-    async function loadSound() {
-      try {
-        const { sound } = await Audio.Sound.createAsync({
-          uri: "https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3",
-        });
-        soundRef.current = sound;
-      } catch (e) {
-        console.log("Error loading sound", e);
-      }
-    }
-
-    loadSound();
-    return () => {
-      if (soundRef.current) {
-        soundRef.current.unloadAsync();
-      }
-    };
-  }, []);
+    beepPlayer.volume = 1;
+  }, [beepPlayer]);
 
   const playBeep = async () => {
-    if (!soundRef.current) return;
-
     try {
-      await soundRef.current.replayAsync();
+      await beepPlayer.seekTo(0);
+      beepPlayer.play();
     } catch (e) {
       console.log("Error playing beep", e);
     }

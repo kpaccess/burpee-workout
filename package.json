@@ -1,7 +1,4 @@
 {
-  "dependencies": {
-    "expo-av": "^16.0.8"
-  },
   "devDependencies": {
     "@types/react": "~19.2.10",
     "typescript": "~5.9.2"
