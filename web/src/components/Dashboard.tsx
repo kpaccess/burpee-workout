@@ -559,11 +559,11 @@ export default function Dashboard({
                         onChange={(e) => {
                           if (isCompleted) {
                             handleToggle(dateStr, true); // uncheck
-                          } else if (isBeginnerTrack) {
+                          } else if (isBeginnerTrack || !isPro) {
                             handleToggle(dateStr, false);
                           } else {
                             setWorkoutMenuAnchor({
-                              anchorEl: e.currentTarget,
+                              anchorEl: e.currentTarget.parentElement as HTMLElement,
                               dateStr,
                             });
                           }
@@ -877,11 +877,12 @@ export default function Dashboard({
           </DialogContent>
         </Dialog>
         {/* Workout Selection Menu */}
-        {isAdvancedTrack && (
+        {isAdvancedTrack && isPro && (
           <Menu
             anchorEl={workoutMenuAnchor?.anchorEl}
             open={Boolean(workoutMenuAnchor)}
             onClose={() => setWorkoutMenuAnchor(null)}
+
           >
             <MenuItem
               onClick={() => {
@@ -889,7 +890,7 @@ export default function Dashboard({
                 setWorkoutMenuAnchor(null);
               }}
             >
-              Burpee + Pushups
+              {userData.currentLevelId || ""}(N)
             </MenuItem>
             <MenuItem
               onClick={() => {
@@ -897,7 +898,7 @@ export default function Dashboard({
                 setWorkoutMenuAnchor(null);
               }}
             >
-              Burpee (no pushups)
+              {userData.currentLevelId || ""}(C)
             </MenuItem>
           </Menu>
         )}
