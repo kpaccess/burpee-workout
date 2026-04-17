@@ -1,9 +1,19 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   WorkoutMode,
   WorkoutTimerConfig,
   WorkoutTimerModeConfig,
 } from "../../../shared/workoutTimer";
+import {
+  playCountdownTick,
+  playGoBeep,
+  playRepBeep,
+  playFinishBeep,
+} from "../lib/sounds";
+
+const PREPARE_SECONDS = 10;
+
+type TimerPhase = "idle" | "prepare" | "workout" | "done";
 
 interface UseWorkoutTimerOptions {
   config: WorkoutTimerConfig;
@@ -22,6 +32,9 @@ export function useWorkoutTimer({
   const [secondsLeft, setSecondsLeft] = useState(config.initialMinutes * 60);
   const [isActive, setIsActive] = useState(false);
   const [currentRep, setCurrentRep] = useState(0);
+  const [phase, setPhase] = useState<TimerPhase>("idle");
+  const [prepareSecondsLeft, setPrepareSecondsLeft] =
+    useState(PREPARE_SECONDS);
 
   const onFinishRef = useRef(onFinish);
   const onRepBoundaryRef = useRef(onRepBoundary);
@@ -51,6 +64,32 @@ export function useWorkoutTimer({
         )
       : null;
 
+  // ── Prepare countdown ──────────────────────────────────────────────
+  useEffect(() => {
+    if (phase !== "prepare") return;
+
+    if (prepareSecondsLeft <= 0) {
+      // Prepare done → GO!
+      playGoBeep();
+      setPhase("workout");
+      setIsActive(true);
+      return;
+    }
+
+    const timerId = setInterval(() => {
+      setPrepareSecondsLeft((prev) => {
+        const next = prev - 1;
+        if (next > 0) {
+          playCountdownTick();
+        }
+        return next;
+      });
+    }, 1000);
+
+    return () => clearInterval(timerId);
+  }, [phase, prepareSecondsLeft]);
+
+  // ── Workout countdown ──────────────────────────────────────────────
   useEffect(() => {
     if (!isActive || secondsLeft <= 0) {
       return;
@@ -70,12 +109,15 @@ export function useWorkoutTimer({
           if (isRepBoundary) {
             const rep = Math.round(rawRep);
             setCurrentRep(rep);
+            playRepBeep();
             onRepBoundaryRef.current?.(rep, activeMode.mode);
           }
         }
 
         if (clampedNextValue === 0) {
           setIsActive(false);
+          setPhase("done");
+          playFinishBeep();
           onFinishRef.current?.();
         }
 
@@ -85,22 +127,36 @@ export function useWorkoutTimer({
 
     return () => clearInterval(timerId);
   }, [activeMode.mode, intervalSeconds, isActive, secondsLeft, totalSeconds]);
+
   const resetTimer = () => {
     setIsActive(false);
+    setPhase("idle");
     setSecondsLeft(totalSeconds);
     setCurrentRep(0);
+    setPrepareSecondsLeft(PREPARE_SECONDS);
   };
 
-  const toggleTimer = () => {
-    if (secondsLeft === 0) {
+  const toggleTimer = useCallback(() => {
+    if (phase === "idle" || phase === "done") {
+      // Fresh start → kick off prepare countdown
       setSecondsLeft(totalSeconds);
       setCurrentRep(0);
-      setIsActive(true);
+      setPrepareSecondsLeft(PREPARE_SECONDS);
+      playCountdownTick();
+      setPhase("prepare");
       return;
     }
 
+    if (phase === "prepare") {
+      // Cancel prepare → go back to idle
+      setPhase("idle");
+      setPrepareSecondsLeft(PREPARE_SECONDS);
+      return;
+    }
+
+    // phase === "workout" → pause / resume
     setIsActive((currentValue) => !currentValue);
-  };
+  }, [phase, totalSeconds]);
 
   const selectMode = (nextMode: WorkoutMode) => {
     if (nextMode === activeMode.mode) {
@@ -109,8 +165,10 @@ export function useWorkoutTimer({
 
     setSelectedMode(nextMode);
     setIsActive(false);
+    setPhase("idle");
     setSecondsLeft(totalSeconds);
     setCurrentRep(0);
+    setPrepareSecondsLeft(PREPARE_SECONDS);
   };
 
   return {
@@ -122,6 +180,8 @@ export function useWorkoutTimer({
     isActive,
     currentRep,
     secondsToNextRep,
+    phase,
+    prepareSecondsLeft,
     toggleTimer,
     resetTimer,
     selectMode,

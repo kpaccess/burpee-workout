@@ -46,6 +46,8 @@ export default function WorkoutTimer({
     isActive,
     currentRep,
     secondsToNextRep,
+    phase,
+    prepareSecondsLeft,
     toggleTimer,
     resetTimer,
     selectMode,
@@ -55,6 +57,7 @@ export default function WorkoutTimer({
   });
 
   const isBeginnerTrack = tier === "beginner";
+  const isPreparing = phase === "prepare";
 
   return (
     <Card
@@ -97,11 +100,38 @@ export default function WorkoutTimer({
         </Box>
       )}
 
-      <Typography variant="h2" fontWeight={900} color="primary.main">
-        {formatWorkoutTimerTime(secondsLeft)}
-      </Typography>
+      {/* ── Prepare countdown overlay ────────────────────────────── */}
+      {isPreparing ? (
+        <Box>
+          <Typography
+            variant="h2"
+            fontWeight={900}
+            sx={{
+              color: "#FFB300",
+              animation: "pulse 1s ease-in-out infinite",
+              "@keyframes pulse": {
+                "0%, 100%": { opacity: 1, transform: "scale(1)" },
+                "50%": { opacity: 0.7, transform: "scale(1.08)" },
+              },
+            }}
+          >
+            {prepareSecondsLeft}
+          </Typography>
+          <Typography
+            variant="subtitle1"
+            fontWeight={700}
+            sx={{ color: "#FFB300", mt: 0.5 }}
+          >
+            GET READY
+          </Typography>
+        </Box>
+      ) : (
+        <Typography variant="h2" fontWeight={900} color="primary.main">
+          {formatWorkoutTimerTime(secondsLeft)}
+        </Typography>
+      )}
 
-      {activeMode.goal > 0 ? (
+      {!isPreparing && activeMode.goal > 0 ? (
         <Box>
           <Typography
             variant="subtitle2"
@@ -116,19 +146,34 @@ export default function WorkoutTimer({
             </Typography>
           )}
         </Box>
-      ) : (
+      ) : !isPreparing ? (
         <Typography variant="body2" color="text.secondary">
           Beginner paces at 1 rep every minute for 20 total reps.
         </Typography>
-      )}
+      ) : null}
 
       <Stack direction="row" spacing={1.5}>
         <Button
           variant="contained"
-          startIcon={isActive ? <PauseIcon /> : <PlayArrowIcon />}
+          startIcon={
+            isPreparing ? (
+              <PauseIcon />
+            ) : isActive ? (
+              <PauseIcon />
+            ) : (
+              <PlayArrowIcon />
+            )
+          }
           onClick={toggleTimer}
+          color={isPreparing ? "warning" : "primary"}
         >
-          {isActive ? "Pause" : secondsLeft === 0 ? "Restart" : "Start"}
+          {isPreparing
+            ? "Cancel"
+            : isActive
+              ? "Pause"
+              : phase === "done"
+                ? "Restart"
+                : "Start"}
         </Button>
         <Button
           variant="outlined"
