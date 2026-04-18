@@ -44,7 +44,11 @@ export default function LandingPage() {
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
         >
-          <Stack spacing={2} alignItems="flex-start" mb={5}>
+          <Stack
+            spacing={2}
+            alignItems={{ xs: "center", md: "flex-start" }}
+            mb={5}
+          >
             <Chip
               icon={<FitnessCenterIcon />}
               label="BurpeePacer"
@@ -56,7 +60,14 @@ export default function LandingPage() {
             />
             <Typography
               variant="h2"
-              sx={{ fontWeight: 900, lineHeight: 1.05, maxWidth: 780 }}
+              sx={{
+                width: "100%",
+                fontWeight: 900,
+                lineHeight: 1.05,
+                maxWidth: 780,
+                mx: { xs: "auto", md: 0 },
+                textAlign: { xs: "center", md: "left" },
+              }}
             >
               Burpees: Simple, Brutal,
               <Box component="span" sx={{ color: "primary.main" }}>
@@ -66,8 +77,13 @@ export default function LandingPage() {
             </Typography>
             <Typography
               variant="h6"
-              color="text.secondary"
-              sx={{ maxWidth: 760 }}
+              sx={{
+                width: "100%",
+                maxWidth: 760,
+                mx: { xs: "auto", md: 0 },
+                color: "rgba(255,255,255,0.76)",
+                textAlign: { xs: "center", md: "left" },
+              }}
             >
               Start with 60-day free access for all users, then continue with
               the plan that fits you. Both tracks are built around simple,
@@ -76,9 +92,12 @@ export default function LandingPage() {
             <Typography
               variant="body1"
               sx={{
+                width: "100%",
                 maxWidth: 760,
+                mx: { xs: "auto", md: 0 },
                 color: "rgba(255,255,255,0.86)",
                 fontWeight: 600,
+                textAlign: { xs: "center", md: "left" },
               }}
             >
               Consistency is the real secret. Follow your schedule, show up on
@@ -86,12 +105,15 @@ export default function LandingPage() {
             </Typography>
             <Box
               sx={{
+                width: "100%",
                 maxWidth: 760,
+                mx: { xs: "auto", md: 0 },
                 px: 2,
                 py: 1.5,
                 borderRadius: 2,
                 background: "rgba(255,255,255,0.04)",
                 border: "1px solid rgba(255,255,255,0.1)",
+                textAlign: { xs: "center", md: "left" },
               }}
             >
               <Typography
@@ -103,14 +125,25 @@ export default function LandingPage() {
               </Typography>
               <Typography
                 variant="body2"
-                color="text.secondary"
+                color="rgba(255,255,255,0.72)"
                 sx={{ mt: 0.5 }}
               >
                 This app is an independent project and is not affiliated with or
                 endorsed by Busy Dad Training.
               </Typography>
             </Box>
-            <Stack direction={{ xs: "column", sm: "row" }} spacing={2} pt={1}>
+            <Stack
+              direction={{ xs: "column", sm: "row" }}
+              spacing={2}
+              pt={1}
+              alignItems={{ xs: "center", sm: "stretch" }}
+              sx={{
+                width: "100%",
+                maxWidth: 760,
+                mx: { xs: "auto", md: 0 },
+                justifyContent: { xs: "center", sm: "flex-start" },
+              }}
+            >
               <Button
                 variant="contained"
                 size="large"
@@ -130,7 +163,7 @@ export default function LandingPage() {
                 variant="text"
                 size="large"
                 onClick={() => router.push("/login")}
-                sx={{ color: "text.secondary" }}
+                sx={{ color: "rgba(255,255,255,0.76)" }}
               >
                 Already a member? Sign in
               </Button>
