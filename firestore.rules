@@ -1,0 +1,60 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ─── users/{userId} ───────────────────────────────────────────────
+    // Each user document stores profile data, workout logs, and
+    // subscription state.  Users may only read/write their own document.
+    //
+    // Subscription fields (isPro, stripeCustomerId, stripeSubscriptionId,
+    // subscriptionStatus, trialEndsAt) are written exclusively by the
+    // server-side Admin SDK (Stripe webhook + claim-subscription API
+    // route). Admin SDK writes bypass security rules entirely.
+    match /users/{userId} {
+
+      // Authenticated users can read ONLY their own document
+      allow read: if request.auth != null
+                  && request.auth.uid == userId;
+
+      // Authenticated users can create their own document
+      // (e.g. first login / onboarding — workout logs, preferences, etc.)
+      allow create: if request.auth != null
+                    && request.auth.uid == userId
+                    && !request.resource.data.keys().hasAny([
+                         'isPro', 'stripeCustomerId',
+                         'stripeSubscriptionId', 'subscriptionStatus',
+                         'trialEndsAt'
+                       ]);
+
+      // Authenticated users can update their own document but CANNOT
+      // modify subscription-related fields from the client.
+      allow update: if request.auth != null
+                    && request.auth.uid == userId
+                    && !request.resource.data.diff(resource.data).affectedKeys()
+                        .hasAny([
+                          'isPro', 'stripeCustomerId',
+                          'stripeSubscriptionId', 'subscriptionStatus',
+                          'trialEndsAt'
+                        ]);
+
+      // Users should not be able to delete their document from the client
+      allow delete: if false;
+    }
+
+    // ─── pending_subscriptions/{email} ────────────────────────────────
+    // Created by the Stripe webhook via Admin SDK (server-side) for
+    // guest checkouts.  Claimed by /api/claim-subscription via Admin SDK.
+    //
+    // No client-side access is needed — all reads, writes, and deletes
+    // happen server-side through the Admin SDK which bypasses rules.
+    match /pending_subscriptions/{email} {
+      allow read, write: if false;
+    }
+
+    // ─── Default: deny everything else ────────────────────────────────
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

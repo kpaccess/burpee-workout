@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import type Stripe from "stripe";
 import stripe from "@/lib/stripe";
-import { db } from "@/lib/firebase";
-import { doc, setDoc } from "firebase/firestore";
+import { getAdminDb } from "@/lib/firebase-admin";
 
 type StripeInvoiceWithSubscription = Stripe.Invoice & {
   subscription?: string | Stripe.Subscription | null;
@@ -13,19 +12,19 @@ async function storePendingSubscription(
   email: string,
   data: Record<string, unknown>,
 ) {
-  if (!db) return;
-  const pendingRef = doc(db, "pending_subscriptions", email.toLowerCase());
-  await setDoc(pendingRef, { ...data, createdAt: new Date().toISOString() });
+  const db = getAdminDb();
+  const pendingRef = db.collection("pending_subscriptions").doc(email.toLowerCase());
+  await pendingRef.set({ ...data, createdAt: new Date().toISOString() });
 }
 
-// setDoc with merge:true works whether the doc exists or not
+// Update (or create via merge) a user doc in Firestore
 async function updateFirestoreUser(
   firebaseUserId: string,
   data: Record<string, unknown>,
 ) {
-  if (!db) return;
-  const userRef = doc(db, "users", firebaseUserId);
-  await setDoc(userRef, data, { merge: true });
+  const db = getAdminDb();
+  const userRef = db.collection("users").doc(firebaseUserId);
+  await userRef.set(data, { merge: true });
 }
 
 export async function POST(req: NextRequest) {

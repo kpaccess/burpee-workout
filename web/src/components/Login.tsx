@@ -10,6 +10,7 @@ import {
   Alert,
   InputAdornment,
   IconButton,
+  CircularProgress,
 } from "@mui/material";
 import { Visibility, VisibilityOff } from "@mui/icons-material";
 import { motion } from "framer-motion";
@@ -18,31 +19,23 @@ import {
   createUserWithEmailAndPassword,
   sendPasswordResetEmail,
 } from "firebase/auth";
-import { auth, db, missingFirebaseEnvVars } from "../lib/firebase";
-import { doc, getDoc, setDoc, deleteDoc } from "firebase/firestore";
+import { auth, missingFirebaseEnvVars } from "../lib/firebase";
 import { useRouter } from "next/navigation";
 
 // After a user signs up or logs in, check if they paid before creating an account
 // and automatically link the pending advanced subscription to their new Firebase user.
+// This calls a server-side API route so the client never writes subscription fields
+// directly to Firestore (those fields are protected by security rules).
 async function claimPendingSubscription(uid: string, email: string) {
-  if (!db) return;
-  const pendingRef = doc(db, "pending_subscriptions", email.toLowerCase());
-  const pendingSnap = await getDoc(pendingRef);
-  if (!pendingSnap.exists()) return;
-
-  const data = pendingSnap.data();
-  const userRef = doc(db, "users", uid);
-  await setDoc(
-    userRef,
-    {
-      isPro: true,
-      stripeCustomerId: data.stripeCustomerId ?? null,
-      stripeSubscriptionId: data.stripeSubscriptionId ?? null,
-      subscriptionStatus: data.subscriptionStatus ?? "active",
-    },
-    { merge: true },
-  );
-  await deleteDoc(pendingRef);
+  try {
+    await fetch("/api/claim-subscription", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ uid, email }),
+    });
+  } catch (err) {
+    console.error("Failed to claim pending subscription:", err);
+  }
 }
 
 interface LoginProps {
@@ -65,10 +58,12 @@ export default function Login({ onBackToInfo }: LoginProps) {
       : "",
   );
   const [showPassword, setShowPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    setIsLoading(true);
     if (!auth) {
       setError(
         `Firebase is not configured in this deployment. Missing env vars: ${missingFirebaseEnvVars.join(", ")}`,
@@ -97,6 +92,7 @@ export default function Login({ onBackToInfo }: LoginProps) {
           : null;
       const destination = nextPath && nextPath.startsWith("/") ? nextPath : "/";
       router.push(destination);
+      // Keep loading state active — the page will navigate away
     } catch (err) {
       const code = (err as { code?: string }).code ?? "";
       if (
@@ -113,6 +109,7 @@ export default function Login({ onBackToInfo }: LoginProps) {
       } else {
         setError((err as Error).message);
       }
+      setIsLoading(false);
     }
   };
 
@@ -201,6 +198,7 @@ export default function Login({ onBackToInfo }: LoginProps) {
               type="email"
               fullWidth
               required
+              disabled={isLoading}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               aria-label="Email"
@@ -231,6 +229,7 @@ export default function Login({ onBackToInfo }: LoginProps) {
               type={showPassword ? "text" : "password"}
               fullWidth
               required
+              disabled={isLoading}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               aria-label="Password"
@@ -268,9 +267,14 @@ export default function Login({ onBackToInfo }: LoginProps) {
             color="primary"
             fullWidth
             size="large"
+            disabled={isLoading}
             sx={{ mt: 3, mb: 2 }}
           >
-            {isLogin ? "Sign In" : "Sign Up"}
+            {isLoading ? (
+              <CircularProgress size={24} color="inherit" />
+            ) : (
+              isLogin ? "Sign In" : "Sign Up"
+            )}
           </Button>
         </form>
 
