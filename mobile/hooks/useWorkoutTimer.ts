@@ -5,6 +5,8 @@ import {
   WorkoutTimerModeConfig,
 } from "../lib/workoutTimer";
 
+const REP_EPSILON = 1e-9;
+
 interface UseWorkoutTimerOptions {
   config: WorkoutTimerConfig;
   onFinish?: () => void;
@@ -43,11 +45,18 @@ export function useWorkoutTimer({
   const intervalSeconds =
     activeMode.goal > 0 ? totalSeconds / activeMode.goal : 0;
   const secondsDone = totalSeconds - secondsLeft;
-  const secondsToNextRep =
+  const repsCompleted =
     intervalSeconds > 0
+      ? Math.min(
+          activeMode.goal,
+          Math.floor(secondsDone / intervalSeconds + REP_EPSILON),
+        )
+      : 0;
+  const secondsToNextRep =
+    intervalSeconds > 0 && repsCompleted < activeMode.goal
       ? Math.max(
           0,
-          Math.ceil(intervalSeconds - (secondsDone % intervalSeconds)),
+          Math.ceil((repsCompleted + 1) * intervalSeconds - secondsDone),
         )
       : null;
 
@@ -60,15 +69,20 @@ export function useWorkoutTimer({
       setSecondsLeft((previousValue) => {
         const nextValue = previousValue - 1;
         const clampedNextValue = nextValue < 0 ? 0 : nextValue;
+        const previousTimeElapsed = totalSeconds - previousValue;
         const timeElapsed = totalSeconds - clampedNextValue;
 
         if (intervalSeconds > 0) {
-          const rawRep = timeElapsed / intervalSeconds;
-          const isRepBoundary =
-            timeElapsed > 0 && Math.abs(rawRep - Math.round(rawRep)) < 0.01;
+          const previousRep = Math.min(
+            activeMode.goal,
+            Math.floor(previousTimeElapsed / intervalSeconds + REP_EPSILON),
+          );
+          const rep = Math.min(
+            activeMode.goal,
+            Math.floor(timeElapsed / intervalSeconds + REP_EPSILON),
+          );
 
-          if (isRepBoundary) {
-            const rep = Math.round(rawRep);
+          if (rep > previousRep) {
             setCurrentRep(rep);
             onRepBoundaryRef.current?.(rep, activeMode.mode);
           }

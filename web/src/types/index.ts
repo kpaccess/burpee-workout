@@ -116,9 +116,9 @@ export const BEGINNER_LEVELS: LevelDescription[] = [
   {
     id: "B1",
     name: "Beginner 1",
-    description: "25 burpees (no pushups) in 20 min.",
+    description: "20 burpees (no pushups) in 20 min.",
     seals: 0,
-    sixCounts: 25,
+    sixCounts: 20,
     timeLimitMintues: 20,
   },
   {

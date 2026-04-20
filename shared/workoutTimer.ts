@@ -30,6 +30,8 @@ export function buildWorkoutTimerConfig({
   sixCountsGoal = 0,
 }: BuildWorkoutTimerConfigOptions): WorkoutTimerConfig {
   if (tier === "beginner") {
+    const beginnerGoal = sixCountsGoal > 0 ? sixCountsGoal : initialMinutes;
+
     return {
       tier,
       initialMinutes,
@@ -39,8 +41,8 @@ export function buildWorkoutTimerConfig({
           mode: "C",
           label: "Beginner Session",
           shortLabel: "B",
-          description: "1 rep every minute for 20 minutes",
-          goal: initialMinutes,
+          description: `${beginnerGoal} burpees (no pushups) in ${initialMinutes} minutes`,
+          goal: beginnerGoal,
         },
       ],
     };

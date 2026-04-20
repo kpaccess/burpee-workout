@@ -148,7 +148,7 @@ export default function WorkoutTimer({
         </Box>
       ) : !isPreparing ? (
         <Typography variant="body2" color="text.secondary">
-          Beginner paces at 1 rep every minute for 20 total reps.
+          Beginner uses the selected level target for this 20-minute session.
         </Typography>
       ) : null}
 
