@@ -10,6 +10,8 @@ const ALLOWED_EMAILS: string[] = [
   "shareengill@gmail.com",
   "admin@gmail.com",
   "ukpslg09@gmail.com",
+  "tamilintcs@gmail.com",
+  "berikivinod@gmail.com",
 ];
 
 export function isAllowlisted(email: string | null | undefined): boolean {
