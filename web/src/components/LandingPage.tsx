@@ -1,7 +1,8 @@
 "use client";
 
-import React from "react";
+import React, { useEffect } from "react";
 import {
+  Alert,
   Box,
   Button,
   Card,
@@ -10,15 +11,19 @@ import {
   Stack,
   Typography,
 } from "@mui/material";
-import FitnessCenterIcon from "@mui/icons-material/FitnessCenter";
 import MilitaryTechIcon from "@mui/icons-material/MilitaryTech";
 import BoltIcon from "@mui/icons-material/Bolt";
 import WorkspacePremiumIcon from "@mui/icons-material/WorkspacePremium";
 import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
+import BurpeeLogoIcon from "@/components/BurpeeLogoIcon";
 
 export default function LandingPage() {
   const router = useRouter();
+
+  useEffect(() => {
+    fetch("/api/analytics/visit", { method: "POST" }).catch(() => {});
+  }, []);
   const weeklySchedule = [
     { day: "Mon", train: true },
     { day: "Tue", train: true },
@@ -49,15 +54,7 @@ export default function LandingPage() {
             alignItems={{ xs: "center", md: "flex-start" }}
             mb={5}
           >
-            <Chip
-              icon={<FitnessCenterIcon />}
-              label="BurpeePacer"
-              sx={{
-                bgcolor: "rgba(255,255,255,0.08)",
-                color: "white",
-                border: "1px solid rgba(255,255,255,0.18)",
-              }}
-            />
+            <BurpeeLogoIcon size={56} />
             <Typography
               variant="h2"
               sx={{
@@ -418,6 +415,24 @@ export default function LandingPage() {
             </Card>
           </Grid>
         </Grid>
+
+        <Alert
+          severity="warning"
+          sx={{ mt: 4, borderRadius: 2 }}
+          icon={false}
+        >
+          <Typography variant="subtitle2" fontWeight={700} mb={0.5}>
+            ⚠️ Please read before you begin
+          </Typography>
+          <Typography variant="body2">
+            I am not a coach or medical professional. Please consult your
+            doctor before starting any exercise program. Always start from the
+            very beginning, progress gradually day by day, and only do the
+            burpees you are capable of — strive for a little more each day. It
+            is perfectly fine to stay at one level and get fit there; advancing
+            through levels is never required.
+          </Typography>
+        </Alert>
       </Box>
     </Box>
   );

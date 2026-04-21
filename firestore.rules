@@ -52,6 +52,13 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // ─── analytics/{document} ────────────────────────────────────────
+    // Page-view counters written exclusively by the server-side Admin SDK
+    // via /api/analytics/visit. No client access needed.
+    match /analytics/{document} {
+      allow read, write: if false;
+    }
+
     // ─── Default: deny everything else ────────────────────────────────
     match /{document=**} {
       allow read, write: if false;

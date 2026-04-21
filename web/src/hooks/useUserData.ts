@@ -53,12 +53,23 @@ export function useUserData() {
 
   const saveUserData = async (data: Partial<UserData>) => {
     if (!user) return;
+    const isFirstSave = !userData; // userData is null before first onboarding
     const baseData = (userData ?? {}) as Partial<UserData>;
     const newData = { ...baseData, ...data } as UserData;
     setUserData(newData); // Optimistic UI update
     try {
       await saveUserDataDB(user.uid, newData);
       setSyncError(null);
+      // Send welcome email only on the very first onboarding save
+      if (isFirstSave && user.email) {
+        fetch("/api/send-welcome-email", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ uid: user.uid, email: user.email }),
+        }).catch(() => {
+          // Non-critical — don't block the user if email fails
+        });
+      }
     } catch (err) {
       console.error("Failed to save user data to Firebase", err);
       setSyncError(

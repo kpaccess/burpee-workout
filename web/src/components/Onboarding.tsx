@@ -259,6 +259,16 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
               </label>
             </Box>
 
+            <Alert severity="warning" sx={{ mt: 1 }}>
+              <strong>Please read before you begin:</strong> I am not a coach
+              or medical professional. Please consult your doctor before
+              starting any exercise program. Always start from the very
+              beginning, progress gradually day by day, and only do the burpees
+              you are capable of — strive for a little more each day. It is
+              perfectly fine to stay at one level and get fit there; advancing
+              levels is never required.
+            </Alert>
+
             <Button
               type="submit"
               variant="contained"
