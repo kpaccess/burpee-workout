@@ -78,6 +78,7 @@ export default function Dashboard({
   } | null>(null);
   const [dismissedAdvancedSuggestion, setDismissedAdvancedSuggestion] =
     useState(false);
+  const [openTrackSwitch, setOpenTrackSwitch] = useState(false);
   // Legacy users may not have workoutTier stored yet; keep them on advanced
   // unless they are clearly on a beginner B-level.
   const inferredTier =
@@ -399,7 +400,7 @@ export default function Dashboard({
                     Workout option: Burpee without pushups
                   </Typography>
                 )}
-                <Box mt={1.5}>
+                <Box mt={1.5} display="flex" alignItems="center" gap={1} flexWrap="wrap">
                   <Chip
                     label={
                       isAdvancedTrack
@@ -411,6 +412,15 @@ export default function Dashboard({
                     color={isAdvancedTrack ? "primary" : "secondary"}
                     sx={{ fontWeight: 700 }}
                   />
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    color="inherit"
+                    onClick={() => setOpenTrackSwitch(true)}
+                    sx={{ fontSize: "0.7rem", py: 0.25 }}
+                  >
+                    Switch Program
+                  </Button>
                 </Box>
                 {userData.trialEndsAt && (
                   <Typography variant="body2" color="secondary" mt={1}>
@@ -783,6 +793,49 @@ export default function Dashboard({
               >
                 Save Level
               </Button>
+            </Box>
+          </DialogContent>
+        </Dialog>
+
+        {/* Switch Program Dialog */}
+        <Dialog
+          open={openTrackSwitch}
+          onClose={() => setOpenTrackSwitch(false)}
+          maxWidth="sm"
+          fullWidth
+        >
+          <DialogTitle>Switch Program</DialogTitle>
+          <DialogContent>
+            <Typography variant="body2" color="text.secondary" mb={3}>
+              Choose the track you want to follow. Switching will reset your
+              current level to the start of the new track.
+            </Typography>
+            <Box display="flex" flexDirection="column" gap={2}>
+              <Button
+                variant={isBeginnerTrack ? "contained" : "outlined"}
+                color="success"
+                onClick={() => {
+                  if (!onUpdateData) return;
+                  onUpdateData({ workoutTier: "beginner", currentLevelId: "B1" });
+                  setOpenTrackSwitch(false);
+                }}
+              >
+                Beginner Track (B1–B6)
+              </Button>
+              <Button
+                variant={isAdvancedTrack ? "contained" : "outlined"}
+                color="primary"
+                onClick={() => {
+                  if (!onUpdateData) return;
+                  onUpdateData({ workoutTier: "advanced", currentLevelId: "1B" });
+                  setOpenTrackSwitch(false);
+                }}
+              >
+                Advanced Track (1B–Grad)
+              </Button>
+            </Box>
+            <Box mt={3} display="flex" justifyContent="flex-end">
+              <Button onClick={() => setOpenTrackSwitch(false)}>Cancel</Button>
             </Box>
           </DialogContent>
         </Dialog>

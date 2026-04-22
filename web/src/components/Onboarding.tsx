@@ -13,8 +13,11 @@ import {
   InputLabel,
   FormControl,
   Alert,
+  Chip,
 } from "@mui/material";
 import PhotoCamera from "@mui/icons-material/PhotoCamera";
+import FitnessCenterIcon from "@mui/icons-material/FitnessCenter";
+import StarIcon from "@mui/icons-material/Star";
 import { motion } from "framer-motion";
 import Image from "next/image";
 import { ADVANCED_LEVELS, BEGINNER_LEVELS, WorkoutTier } from "../types";
@@ -40,7 +43,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
   const [weight, setWeight] = useState("");
   const [pictureUrl, setPictureUrl] = useState<string | null>(null);
   const [level, setLevel] = useState("B1");
-  const [workoutTier, setWorkoutTier] = useState<WorkoutTier>("beginner");
+  const [workoutTier, setWorkoutTier] = useState<WorkoutTier | null>(null);
   const isBeginnerTrack = workoutTier === "beginner";
   const levelsForTier = useMemo(
     () => (isBeginnerTrack ? BEGINNER_LEVELS : ADVANCED_LEVELS),
@@ -61,9 +64,14 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
     }
   };
 
+  const handleTierSelect = (tier: WorkoutTier) => {
+    setWorkoutTier(tier);
+    setLevel(tier === "beginner" ? "B1" : "1B");
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!weight) return;
+    if (!weight || !workoutTier) return;
     const start = new Date(`${startDate}T00:00:00`);
     const trialEnds = new Date(start);
     trialEnds.setDate(trialEnds.getDate() + FREE_ACCESS_DAYS);
@@ -92,7 +100,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
         px: 2,
       }}
     >
-      <Card sx={{ p: 4, maxWidth: 500, width: "100%" }}>
+      <Card sx={{ p: 4, maxWidth: 520, width: "100%" }}>
         <Typography
           variant="h4"
           gutterBottom
@@ -109,8 +117,109 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
           color="text.secondary"
           sx={{ mb: 4 }}
         >
-          It&apos;s time to begin your journey. Start with your day 1 stats.
+          It&apos;s time to begin your journey. First, choose your program.
         </Typography>
+
+        {/* Track selection */}
+        <Typography variant="subtitle1" fontWeight={700} sx={{ mb: 1.5 }}>
+          Choose your track
+        </Typography>
+        <Stack direction={{ xs: "column", sm: "row" }} spacing={2} sx={{ mb: 3 }}>
+          {(
+            [
+              {
+                tier: "beginner" as WorkoutTier,
+                icon: <FitnessCenterIcon fontSize="large" />,
+                label: "Beginner",
+                badge: "Free",
+                badgeColor: "success" as const,
+                bullets: [
+                  "Structured 6-level progression",
+                  "No-pushup variant included",
+                  "60-day free trial",
+                ],
+              },
+              {
+                tier: "advanced" as WorkoutTier,
+                icon: <StarIcon fontSize="large" />,
+                label: "Advanced",
+                badge: "Pro",
+                badgeColor: "primary" as const,
+                bullets: [
+                  "Premium multi-phase workouts",
+                  "Graduation track included",
+                  "60-day free trial, then subscription",
+                ],
+              },
+            ] as const
+          ).map(({ tier, icon, label, badge, badgeColor, bullets }) => {
+            const selected = workoutTier === tier;
+            return (
+              <Box
+                key={tier}
+                onClick={() => handleTierSelect(tier)}
+                sx={{
+                  flex: 1,
+                  border: selected ? "2px solid" : "2px solid transparent",
+                  borderColor: selected
+                    ? tier === "beginner"
+                      ? "success.main"
+                      : "primary.main"
+                    : "rgba(255,255,255,0.15)",
+                  borderRadius: 2,
+                  p: 2.5,
+                  cursor: "pointer",
+                  bgcolor: selected
+                    ? tier === "beginner"
+                      ? "rgba(102,187,106,0.08)"
+                      : "rgba(144,202,249,0.08)"
+                    : "rgba(255,255,255,0.03)",
+                  transition: "all 0.2s",
+                  "&:hover": {
+                    borderColor:
+                      tier === "beginner" ? "success.main" : "primary.main",
+                    bgcolor:
+                      tier === "beginner"
+                        ? "rgba(102,187,106,0.05)"
+                        : "rgba(144,202,249,0.05)",
+                  },
+                }}
+              >
+                <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1 }}>
+                  <Box
+                    sx={{
+                      color:
+                        tier === "beginner" ? "success.main" : "primary.main",
+                    }}
+                  >
+                    {icon}
+                  </Box>
+                  <Typography variant="h6" fontWeight={700}>
+                    {label}
+                  </Typography>
+                  <Chip
+                    label={badge}
+                    color={badgeColor}
+                    size="small"
+                    sx={{ ml: "auto" }}
+                  />
+                </Stack>
+                <Stack spacing={0.5}>
+                  {bullets.map((b) => (
+                    <Typography
+                      key={b}
+                      variant="body2"
+                      color="text.secondary"
+                      sx={{ display: "flex", alignItems: "flex-start", gap: 0.5 }}
+                    >
+                      <span>•</span> {b}
+                    </Typography>
+                  ))}
+                </Stack>
+              </Box>
+            );
+          })}
+        </Stack>
 
         <Alert severity={user ? "info" : "warning"} sx={{ mb: 3 }}>
           <Typography
@@ -145,15 +254,6 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
           </Button>
         </Alert>
 
-        <Alert
-          severity={workoutTier === "beginner" ? "success" : "info"}
-          sx={{ mb: 3 }}
-        >
-          {workoutTier === "beginner"
-            ? "You get 60-day free access from your start date. After that, advanced features require a subscription."
-            : "You get 60-day free access from your start date. After that, advanced features require a subscription."}
-        </Alert>
-
         <form onSubmit={handleSubmit}>
           <Stack spacing={3}>
             <TextField
@@ -175,42 +275,23 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
               required
             />
 
-            <FormControl fullWidth required>
-              <InputLabel id="workout-tier-label">Workout Type</InputLabel>
-              <Select
-                labelId="workout-tier-label"
-                value={workoutTier}
-                label="Workout Type"
-                onChange={(e) => {
-                  const nextTier = e.target.value as WorkoutTier;
-                  setWorkoutTier(nextTier);
-                  setLevel(nextTier === "beginner" ? "B1" : "1B");
-                }}
-              >
-                <MenuItem value="beginner">
-                  Beginner - starter guidance and no-pushup progression
-                </MenuItem>
-                <MenuItem value="advanced">
-                  Advanced - paid track with premium workouts
-                </MenuItem>
-              </Select>
-            </FormControl>
-
-            <FormControl fullWidth required>
-              <InputLabel id="level-label">Starting Level</InputLabel>
-              <Select
-                labelId="level-label"
-                value={level}
-                label="Starting Level"
-                onChange={(e) => setLevel(e.target.value)}
-              >
-                {levelsForTier.map((lvl) => (
-                  <MenuItem key={lvl.id} value={lvl.id}>
-                    {lvl.name} - {lvl.description}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
+            {workoutTier && (
+              <FormControl fullWidth required>
+                <InputLabel id="level-label">Starting Level</InputLabel>
+                <Select
+                  labelId="level-label"
+                  value={level}
+                  label="Starting Level"
+                  onChange={(e) => setLevel(e.target.value)}
+                >
+                  {levelsForTier.map((lvl) => (
+                    <MenuItem key={lvl.id} value={lvl.id}>
+                      {lvl.name} - {lvl.description}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            )}
 
             <Box
               sx={{
@@ -272,13 +353,16 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
             <Button
               type="submit"
               variant="contained"
-              color="primary"
+              color={workoutTier === "advanced" ? "primary" : "success"}
               size="large"
+              disabled={!workoutTier}
               sx={{ mt: 2, py: 1.5, fontSize: "1.1rem" }}
             >
-              {workoutTier === "beginner"
-                ? "Start Beginner Program"
-                : "Continue to Advanced Program"}
+              {!workoutTier
+                ? "Select a program above"
+                : workoutTier === "beginner"
+                  ? "Start Beginner Program"
+                  : "Start Advanced Program"}
             </Button>
           </Stack>
         </form>
