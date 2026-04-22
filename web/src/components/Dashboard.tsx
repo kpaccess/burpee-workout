@@ -43,6 +43,7 @@ import LocalFireDepartmentIcon from "@mui/icons-material/LocalFireDepartment";
 import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
 import { useAuth } from "../context/AuthContext";
 import { toDateKey } from "../lib/date";
+import { isAdmin } from "../lib/allowlist";
 import { useSubscription } from "../hooks/useSubscription";
 import { useRouter } from "next/navigation";
 import WorkoutTimer from "./WorkoutTimer";
@@ -212,7 +213,17 @@ export default function Dashboard({
               Day {Math.max(0, daysPassed)} • Busy People Program
             </Typography>
           </Box>
-          <Box>
+          <Box display="flex" gap={2} alignItems="center">
+            {isAdmin(user?.email) && (
+              <Button
+                variant="outlined"
+                color="secondary"
+                onClick={() => router.push("/admin")}
+                size="small"
+              >
+                Admin
+              </Button>
+            )}
             <Button
               variant="outlined"
               color="error"

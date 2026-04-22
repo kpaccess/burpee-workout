@@ -4,6 +4,9 @@ import { ADMIN_EMAIL } from "@/lib/allowlist";
 import { getAuth } from "firebase-admin/auth";
 
 export interface UserRow {
+  serialNo: number;
+  firstName: string;
+  lastName: string;
   email: string;
   created: string;
   lastLogin: string;
@@ -59,7 +62,13 @@ export async function GET(req: NextRequest) {
 
     const users: UserRow[] = authUsers.map((u, i) => {
       const data = firestoreDocs[i].data() ?? {};
+      const nameParts = (u.displayName ?? "").trim().split(/\s+/);
+      const firstName = nameParts[0] ?? "";
+      const lastName = nameParts.slice(1).join(" ");
       return {
+        serialNo: i + 1,
+        firstName,
+        lastName,
         email: u.email ?? "(no email)",
         created: u.metadata.creationTime,
         lastLogin: u.metadata.lastSignInTime ?? "Never",
@@ -77,6 +86,7 @@ export async function GET(req: NextRequest) {
         new Date(b.lastLogin === "Never" ? 0 : b.lastLogin).getTime() -
         new Date(a.lastLogin === "Never" ? 0 : a.lastLogin).getTime(),
     );
+    users.forEach((u, i) => { u.serialNo = i + 1; });
 
     return NextResponse.json({ pageViews, signupCount: authUsers.length, users });
   } catch (err) {

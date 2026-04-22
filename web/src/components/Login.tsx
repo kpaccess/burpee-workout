@@ -18,6 +18,7 @@ import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   sendPasswordResetEmail,
+  updateProfile,
 } from "firebase/auth";
 import { auth, missingFirebaseEnvVars } from "../lib/firebase";
 import { useRouter } from "next/navigation";
@@ -49,6 +50,8 @@ export default function Login({ onBackToInfo }: LoginProps) {
     typeof window !== "undefined" &&
     new URLSearchParams(window.location.search).get("signup") === "1";
   const [isLogin, setIsLogin] = useState(!isSignupFlow);
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -80,6 +83,15 @@ export default function Login({ onBackToInfo }: LoginProps) {
           email,
           password,
         );
+        const displayName = [firstName.trim(), lastName.trim()].filter(Boolean).join(" ");
+        if (displayName) {
+          await updateProfile(credential.user, { displayName });
+        }
+        fetch("/api/send-welcome-email", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ uid: credential.user.uid, email }),
+        }).catch(() => {});
       }
 
       // If the user paid via Stripe before creating an account, link the
@@ -183,6 +195,60 @@ export default function Login({ onBackToInfo }: LoginProps) {
         )}
 
         <form onSubmit={handleAuth}>
+          {!isLogin && (
+            <Box sx={{ display: "flex", gap: 2, mb: 2 }}>
+              <Box sx={{ flex: 1 }}>
+                <Typography
+                  variant="body2"
+                  sx={{ color: "rgba(255,255,255,0.78)", mb: 0.75, fontWeight: 600 }}
+                >
+                  First Name *
+                </Typography>
+                <TextField
+                  type="text"
+                  fullWidth
+                  required
+                  disabled={isLoading}
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                  aria-label="First Name"
+                  sx={{
+                    "& .MuiOutlinedInput-root": {
+                      backgroundColor: "rgba(255, 255, 255, 0.04)",
+                      "& fieldset": { borderColor: "rgba(255, 255, 255, 0.2)" },
+                      "&:hover fieldset": { borderColor: "rgba(255, 255, 255, 0.35)" },
+                      "&.Mui-focused fieldset": { borderColor: "primary.main" },
+                    },
+                  }}
+                />
+              </Box>
+              <Box sx={{ flex: 1 }}>
+                <Typography
+                  variant="body2"
+                  sx={{ color: "rgba(255,255,255,0.78)", mb: 0.75, fontWeight: 600 }}
+                >
+                  Last Name *
+                </Typography>
+                <TextField
+                  type="text"
+                  fullWidth
+                  required
+                  disabled={isLoading}
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                  aria-label="Last Name"
+                  sx={{
+                    "& .MuiOutlinedInput-root": {
+                      backgroundColor: "rgba(255, 255, 255, 0.04)",
+                      "& fieldset": { borderColor: "rgba(255, 255, 255, 0.2)" },
+                      "&:hover fieldset": { borderColor: "rgba(255, 255, 255, 0.35)" },
+                      "&.Mui-focused fieldset": { borderColor: "primary.main" },
+                    },
+                  }}
+                />
+              </Box>
+            </Box>
+          )}
           <Box sx={{ mb: 2 }}>
             <Typography
               variant="body2"
@@ -293,6 +359,8 @@ export default function Login({ onBackToInfo }: LoginProps) {
             setIsLogin(!isLogin);
             setError("");
             setMessage("");
+            setFirstName("");
+            setLastName("");
           }}
         >
           {isLogin
