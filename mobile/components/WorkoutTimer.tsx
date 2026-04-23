@@ -56,27 +56,40 @@ export const WorkoutTimer: React.FC<WorkoutTimerProps> = ({
     isActive,
     currentRep,
     secondsToNextRep,
+    phase,
+    prepareSecondsLeft,
     toggleTimer,
     resetTimer,
     selectMode,
   } = useWorkoutTimer({
     config: timerConfig,
+    onPrepareTick: () => {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      playBeep(0.2); // Soft tick
+    },
+    onGo: () => {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      playBeep(1.0); // Loud START
+      setTimeout(() => playBeep(1.0), 300); // Double loud beep for GO
+    },
     onFinish: () => {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      playBeep(1.0);
+      setTimeout(() => playBeep(1.0), 400);
       onFinish?.();
     },
     onRepBoundary: () => {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-      playBeep();
+      playBeep(1.0); // Loud rep boundary
     },
   });
 
-  useEffect(() => {
-    beepPlayer.volume = 1;
-  }, [beepPlayer]);
+  // We don't force beepPlayer.volume = 1 statically anymore, we pass it dynamically.
+  // Instead of an effect setting it to 1, we set it on play.
 
-  const playBeep = async () => {
+  const playBeep = async (vol = 1.0) => {
     try {
+      beepPlayer.volume = vol;
       await beepPlayer.seekTo(0);
       beepPlayer.play();
     } catch (e) {
@@ -146,25 +159,48 @@ export const WorkoutTimer: React.FC<WorkoutTimerProps> = ({
           styles.timerCircle,
           { transform: [{ scale: pulseAnim }] },
           isActive && styles.activeTimerCircle,
+          phase === "prepare" && { borderColor: "#00E5FF", shadowColor: "#00E5FF" }
         ]}
       >
-        <Text style={styles.timeText}>
-          {formatWorkoutTimerTime(secondsLeft)}
-        </Text>
-
-        {activeMode.goal > 0 ? (
-          <View style={styles.pacerInfo}>
-            <Text style={styles.repCount}>
-              REP {currentRep} / {activeMode.goal}
-            </Text>
-            {isActive && secondsToNextRep !== null && (
-              <Text style={styles.nextRepText}>
-                Next in {secondsToNextRep}s
+        {phase === "prepare" ? (
+          <>
+            <Text style={styles.timeText}>{prepareSecondsLeft}</Text>
+            <View style={styles.pacerInfo}>
+              <Text style={[styles.repCount, { color: "#00E5FF" }]}>
+                GET READY
               </Text>
-            )}
-          </View>
+            </View>
+          </>
+        ) : phase === "done" ? (
+          <>
+            <Text style={styles.timeText}>00:00</Text>
+            <View style={styles.pacerInfo}>
+              <Text style={[styles.repCount, { color: "#FF3366" }]}>
+                FINISHED
+              </Text>
+            </View>
+          </>
         ) : (
-          <Text style={styles.label}>1 rep every minute</Text>
+          <>
+            <Text style={styles.timeText}>
+              {formatWorkoutTimerTime(secondsLeft)}
+            </Text>
+
+            {activeMode.goal > 0 ? (
+              <View style={styles.pacerInfo}>
+                <Text style={styles.repCount}>
+                  REP {currentRep} / {activeMode.goal}
+                </Text>
+                {isActive && secondsToNextRep !== null && (
+                  <Text style={styles.nextRepText}>
+                    Next in {secondsToNextRep}s
+                  </Text>
+                )}
+              </View>
+            ) : (
+              <Text style={styles.label}>1 rep every minute</Text>
+            )}
+          </>
         )}
       </Animated.View>
       <View style={styles.controls}>

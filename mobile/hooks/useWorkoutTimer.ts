@@ -5,18 +5,25 @@ import {
   WorkoutTimerModeConfig,
 } from "../lib/workoutTimer";
 
+const PREPARE_SECONDS = 10;
 const REP_EPSILON = 1e-9;
+
+export type TimerPhase = "idle" | "prepare" | "workout" | "done";
 
 interface UseWorkoutTimerOptions {
   config: WorkoutTimerConfig;
   onFinish?: () => void;
   onRepBoundary?: (rep: number, mode: WorkoutMode) => void;
+  onPrepareTick?: () => void;
+  onGo?: () => void;
 }
 
 export function useWorkoutTimer({
   config,
   onFinish,
   onRepBoundary,
+  onPrepareTick,
+  onGo,
 }: UseWorkoutTimerOptions) {
   const [selectedMode, setSelectedMode] = useState<WorkoutMode>(
     config.defaultMode,
@@ -24,14 +31,20 @@ export function useWorkoutTimer({
   const [secondsLeft, setSecondsLeft] = useState(config.initialMinutes * 60);
   const [isActive, setIsActive] = useState(false);
   const [currentRep, setCurrentRep] = useState(0);
+  const [phase, setPhase] = useState<TimerPhase>("idle");
+  const [prepareSecondsLeft, setPrepareSecondsLeft] = useState(PREPARE_SECONDS);
 
   const onFinishRef = useRef(onFinish);
   const onRepBoundaryRef = useRef(onRepBoundary);
+  const onPrepareTickRef = useRef(onPrepareTick);
+  const onGoRef = useRef(onGo);
 
   useEffect(() => {
     onFinishRef.current = onFinish;
     onRepBoundaryRef.current = onRepBoundary;
-  }, [onFinish, onRepBoundary]);
+    onPrepareTickRef.current = onPrepareTick;
+    onGoRef.current = onGo;
+  }, [onFinish, onRepBoundary, onPrepareTick, onGo]);
 
   const totalSeconds = config.initialMinutes * 60;
   const mode = config.modes.some((entry) => entry.mode === selectedMode)
@@ -60,6 +73,31 @@ export function useWorkoutTimer({
         )
       : null;
 
+  // ── Prepare countdown ──────────────────────────────────────────────
+  useEffect(() => {
+    if (phase !== "prepare") return;
+
+    if (prepareSecondsLeft <= 0) {
+      onGoRef.current?.();
+      setPhase("workout");
+      setIsActive(true);
+      return;
+    }
+
+    const timerId = setInterval(() => {
+      setPrepareSecondsLeft((prev) => {
+        const next = prev - 1;
+        if (next > 0) {
+          onPrepareTickRef.current?.();
+        }
+        return next;
+      });
+    }, 1000);
+
+    return () => clearInterval(timerId);
+  }, [phase, prepareSecondsLeft]);
+
+  // ── Workout countdown ──────────────────────────────────────────────
   useEffect(() => {
     if (!isActive || secondsLeft <= 0) {
       return;
@@ -90,6 +128,7 @@ export function useWorkoutTimer({
 
         if (clampedNextValue === 0) {
           setIsActive(false);
+          setPhase("done");
           onFinishRef.current?.();
         }
 
@@ -102,15 +141,25 @@ export function useWorkoutTimer({
 
   const resetTimer = () => {
     setIsActive(false);
+    setPhase("idle");
     setSecondsLeft(totalSeconds);
     setCurrentRep(0);
+    setPrepareSecondsLeft(PREPARE_SECONDS);
   };
 
   const toggleTimer = () => {
-    if (secondsLeft === 0) {
+    if (phase === "idle" || phase === "done") {
       setSecondsLeft(totalSeconds);
       setCurrentRep(0);
-      setIsActive(true);
+      setPrepareSecondsLeft(PREPARE_SECONDS);
+      onPrepareTickRef.current?.();
+      setPhase("prepare");
+      return;
+    }
+
+    if (phase === "prepare") {
+      setPhase("idle");
+      setPrepareSecondsLeft(PREPARE_SECONDS);
       return;
     }
 
@@ -124,8 +173,10 @@ export function useWorkoutTimer({
 
     setSelectedMode(nextMode);
     setIsActive(false);
+    setPhase("idle");
     setSecondsLeft(totalSeconds);
     setCurrentRep(0);
+    setPrepareSecondsLeft(PREPARE_SECONDS);
   };
 
   return {
@@ -137,6 +188,8 @@ export function useWorkoutTimer({
     isActive,
     currentRep,
     secondsToNextRep,
+    phase,
+    prepareSecondsLeft,
     toggleTimer,
     resetTimer,
     selectMode,

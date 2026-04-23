@@ -29,6 +29,7 @@ import {
   onAuthStateChanged,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
+  updateProfile,
   signOut,
   User,
 } from "firebase/auth";
@@ -55,6 +56,8 @@ export default function HomeScreen() {
   // Auth Forms
   const [isLoginFlow, setIsLoginFlow] = useState(true);
   const [showAuthForm, setShowAuthForm] = useState(false);
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [authError, setAuthError] = useState("");
@@ -69,6 +72,7 @@ export default function HomeScreen() {
     useState<WorkoutTier>("beginner");
 
   // Dashboard Modals
+  const [showSwitchProgramModal, setShowSwitchProgramModal] = useState(false);
   const [showCheckinModal, setShowCheckinModal] = useState(false);
   const [checkinWeight, setCheckinWeight] = useState("");
   const [checkinPicture, setCheckinPicture] = useState<string | null>(null);
@@ -109,7 +113,11 @@ export default function HomeScreen() {
       if (isLoginFlow) {
         await signInWithEmailAndPassword(auth, email, password);
       } else {
-        await createUserWithEmailAndPassword(auth, email, password);
+        const credential = await createUserWithEmailAndPassword(auth, email, password);
+        const displayName = [firstName.trim(), lastName.trim()].filter(Boolean).join(" ");
+        if (displayName) {
+          await updateProfile(credential.user, { displayName });
+        }
       }
     } catch (err: any) {
       setAuthError(err.message);
@@ -123,7 +131,11 @@ export default function HomeScreen() {
   };
 
   const startProgram = async () => {
-    if (!weight || !user) return;
+    if (!user) return;
+    if (!weight) {
+      setSyncError("Please enter your starting weight to continue.");
+      return;
+    }
     const isBeginnerTrack = selectedWorkoutTier === "beginner";
     const newData: UserData = {
       startDate: date,
@@ -147,6 +159,22 @@ export default function HomeScreen() {
     await signOut(auth);
   };
 
+  const handleSwitchProgram = async (targetTier: WorkoutTier) => {
+    if (!user || !userData) return;
+    const newLevelId = targetTier === "beginner" ? "B1" : "1B";
+    const updates = { workoutTier: targetTier, currentLevelId: newLevelId };
+    const next = { ...userData, ...updates };
+    setUserData(next);
+    setShowSwitchProgramModal(false);
+    try {
+      await saveUserDataDB(user.uid, updates);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch (e) {
+      console.error("Error switching program:", e);
+      setSyncError("Failed to switch program.");
+    }
+  };
+
   const pickImageDataUrl = async (useCamera: boolean) => {
     try {
       const permission = useCamera
@@ -161,12 +189,16 @@ export default function HomeScreen() {
       const result = useCamera
         ? await ImagePicker.launchCameraAsync({
             mediaTypes: ["images"],
-            quality: 0.7,
+            quality: 0.3,
+            allowsEditing: true,
+            aspect: [3, 4],
             base64: true,
           })
         : await ImagePicker.launchImageLibraryAsync({
             mediaTypes: ["images"],
-            quality: 0.7,
+            quality: 0.3,
+            allowsEditing: true,
+            aspect: [3, 4],
             base64: true,
           });
 
@@ -186,8 +218,8 @@ export default function HomeScreen() {
     }
   };
 
-  const pickDay1PictureDraft = async () => {
-    const img = await pickImageDataUrl(false);
+  const pickDay1PictureDraft = async (useCamera: boolean) => {
+    const img = await pickImageDataUrl(useCamera);
     if (img) {
       setDay1PictureDraft(img);
       setSyncError("");
@@ -219,8 +251,13 @@ export default function HomeScreen() {
     }
   };
 
-  const toDateKey = (input: Date | string) =>
-    format(new Date(input), "yyyy-MM-dd");
+  const toDateKey = (input: Date | string) => {
+    if (input instanceof Date) {
+      return format(input, "yyyy-MM-dd");
+    }
+    const trimmed = input.trim();
+    return trimmed.length >= 10 ? trimmed.substring(0, 10) : trimmed;
+  };
 
   const inferWorkoutTier = (
     data: Pick<UserData, "workoutTier" | "currentLevelId">,
@@ -339,11 +376,19 @@ export default function HomeScreen() {
       });
     }
 
-    const next = { ...userData, workoutLogs: logs };
+    const safeLogs = logs.map((log) => {
+      const safeLog: any = { date: log.date, completed: log.completed };
+      if (log.levelCompleted) safeLog.levelCompleted = log.levelCompleted;
+      if (log.workoutType) safeLog.workoutType = log.workoutType;
+      if (log.notes) safeLog.notes = log.notes;
+      return safeLog as WorkoutLog;
+    });
+
+    const next = { ...userData, workoutLogs: safeLogs };
     setUserData(next);
 
     try {
-      await saveUserDataDB(user.uid, { workoutLogs: logs });
+      await saveUserDataDB(user.uid, { workoutLogs: safeLogs });
       setSyncError("");
       if (completed) {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -510,6 +555,26 @@ export default function HomeScreen() {
                 {authError}
               </Text>
             ) : null}
+            {!isLoginFlow && (
+              <View style={{ flexDirection: "row", gap: 10 }}>
+                <TextInput
+                  style={[styles.input, { flex: 1 }]}
+                  value={firstName}
+                  onChangeText={setFirstName}
+                  placeholder="First Name"
+                  placeholderTextColor="#666"
+                  autoCapitalize="words"
+                />
+                <TextInput
+                  style={[styles.input, { flex: 1 }]}
+                  value={lastName}
+                  onChangeText={setLastName}
+                  placeholder="Last Name"
+                  placeholderTextColor="#666"
+                  autoCapitalize="words"
+                />
+              </View>
+            )}
             <TextInput
               style={styles.input}
               value={email}
@@ -536,7 +601,12 @@ export default function HomeScreen() {
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
-              onPress={() => setIsLoginFlow(!isLoginFlow)}
+              onPress={() => {
+                setIsLoginFlow(!isLoginFlow);
+                setFirstName("");
+                setLastName("");
+                setAuthError("");
+              }}
               style={{ marginTop: 20 }}
             >
               <Text
@@ -678,10 +748,15 @@ export default function HomeScreen() {
                   </Text>
                 </View>
               )}
-              <View style={{ marginTop: 10 }}>
+              <View style={{ marginTop: 10, flexDirection: "row", justifyContent: "center", gap: 10 }}>
                 <Button
-                  title={day1PictureDraft ? "Replace Photo" : "Upload Photo"}
-                  onPress={pickDay1PictureDraft}
+                  title="Take Photo"
+                  onPress={() => pickDay1PictureDraft(true)}
+                  color="#FF3366"
+                />
+                <Button
+                  title={day1PictureDraft ? "Replace Upload" : "Upload Photo"}
+                  onPress={() => pickDay1PictureDraft(false)}
                   color="#FF3366"
                 />
               </View>
@@ -784,9 +859,19 @@ export default function HomeScreen() {
               Day {daysPassed} • The Busy Dad Program
             </Text>
           </View>
-          <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
-            <Text style={styles.logoutText}>Log Out</Text>
-          </TouchableOpacity>
+          <View style={{ gap: 8 }}>
+            <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
+              <Text style={styles.logoutText}>Log Out</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.logoutBtn, { borderColor: "#00E5FF" }]}
+              onPress={() => setShowSwitchProgramModal(true)}
+            >
+              <Text style={[styles.logoutText, { color: "#00E5FF" }]}>
+                Switch Program
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         {syncError ? <Text style={styles.errorText}>{syncError}</Text> : null}
@@ -1334,6 +1419,72 @@ export default function HomeScreen() {
             </View>
           </ScrollView>
         </View>
+      </Modal>
+
+      {/* Switch Program Modal */}
+      <Modal
+        visible={showSwitchProgramModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowSwitchProgramModal(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalBackdrop}
+          activeOpacity={1}
+          onPress={() => setShowSwitchProgramModal(false)}
+        >
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Switch Program</Text>
+            <Text style={styles.modalSubtitle}>
+              Your workout logs are kept. Your level will reset to the start of the new program.
+            </Text>
+
+            <TouchableOpacity
+              style={[
+                styles.workoutOptionBtn,
+                workoutTier === "beginner" && { borderColor: "#FF3366", backgroundColor: "rgba(255,51,102,0.08)" },
+              ]}
+              onPress={() => handleSwitchProgram("beginner")}
+            >
+              <View style={[styles.optionIconBox, { backgroundColor: "rgba(255, 51, 102, 0.1)" }]}>
+                <Ionicons name="body-outline" size={24} color="#FF3366" />
+              </View>
+              <View>
+                <Text style={styles.optionTitle}>Beginner</Text>
+                <Text style={styles.optionDesc}>Burpees without pushups · B1–B6</Text>
+              </View>
+              {workoutTier === "beginner" && (
+                <Ionicons name="checkmark-circle" size={20} color="#FF3366" style={{ marginLeft: "auto" }} />
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.workoutOptionBtn,
+                workoutTier === "advanced" && { borderColor: "#00E5FF", backgroundColor: "rgba(0,229,255,0.08)" },
+              ]}
+              onPress={() => handleSwitchProgram("advanced")}
+            >
+              <View style={[styles.optionIconBox, { backgroundColor: "rgba(0, 229, 255, 0.1)" }]}>
+                <Ionicons name="flash-outline" size={24} color="#00E5FF" />
+              </View>
+              <View>
+                <Text style={styles.optionTitle}>Advanced</Text>
+                <Text style={styles.optionDesc}>Navy Seals + 6-counts · 1A–Grad</Text>
+              </View>
+              {workoutTier === "advanced" && (
+                <Ionicons name="checkmark-circle" size={20} color="#00E5FF" style={{ marginLeft: "auto" }} />
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.modalSecondaryBtn, { marginTop: 10, alignSelf: "center", borderWidth: 0, paddingHorizontal: 30 }]}
+              onPress={() => setShowSwitchProgramModal(false)}
+            >
+              <Text style={styles.modalSecondaryBtnText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
       </Modal>
     </SafeAreaView>
   );
