@@ -60,7 +60,9 @@ export default function HomeScreen() {
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [authError, setAuthError] = useState("");
+  const [isAuthenticating, setIsAuthenticating] = useState(false);
 
   // Onboarding Forms
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
@@ -109,6 +111,7 @@ export default function HomeScreen() {
 
   const handleAuth = async () => {
     setAuthError("");
+    setIsAuthenticating(true);
     try {
       if (isLoginFlow) {
         await signInWithEmailAndPassword(auth, email, password);
@@ -121,6 +124,8 @@ export default function HomeScreen() {
       }
     } catch (err: any) {
       setAuthError(err.message);
+    } finally {
+      setIsAuthenticating(false);
     }
   };
 
@@ -584,21 +589,34 @@ export default function HomeScreen() {
               autoCapitalize="none"
               keyboardType="email-address"
             />
-            <TextInput
-              style={styles.input}
-              value={password}
-              onChangeText={setPassword}
-              placeholder="Password"
-              placeholderTextColor="#666"
-              secureTextEntry
-            />
+            <View style={{ position: "relative", marginBottom: 16 }}>
+              <TextInput
+                style={[styles.input, { marginBottom: 0, paddingRight: 45 }]}
+                value={password}
+                onChangeText={setPassword}
+                placeholder="Password"
+                placeholderTextColor="#666"
+                secureTextEntry={!showPassword}
+              />
+              <TouchableOpacity
+                onPress={() => setShowPassword(!showPassword)}
+                style={{ position: "absolute", right: 15, top: 16 }}
+              >
+                <Ionicons name={showPassword ? "eye-off" : "eye"} size={20} color="#666" />
+              </TouchableOpacity>
+            </View>
             <TouchableOpacity
               style={styles.primaryActionBtn}
               onPress={handleAuth}
+              disabled={isAuthenticating}
             >
-              <Text style={styles.primaryActionBtnText}>
-                {isLoginFlow ? "Sign In" : "Sign Up"}
-              </Text>
+              {isAuthenticating ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.primaryActionBtnText}>
+                  {isLoginFlow ? "Sign In" : "Sign Up"}
+                </Text>
+              )}
             </TouchableOpacity>
             <TouchableOpacity
               onPress={() => {
