@@ -1,0 +1,25 @@
+{
+  "skill_name": "code-review-typescript",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Review this React component for security, performance, and correctness issues:\n\n```typescript\n// web/src/components/UserProfile.tsx\nimport React, { useState, useEffect } from 'react';\nimport { getUserData } from '../api/users';\n\ninterface UserProfile {\n  userId: string;\n  name: string;\n  bio: string;\n  email: string;\n}\n\nexport const UserProfile: React.FC<{ userId: string }> = ({ userId }) => {\n  const [user, setUser] = useState<UserProfile | null>(null);\n  const [loading, setLoading] = useState(false);\n\n  useEffect(() => {\n    setLoading(true);\n    getUserData(userId).then(data => {\n      setUser(data);\n      setLoading(false);\n    }).catch(err => console.log(err));\n  }, []);\n\n  const handleUpdate = () => {\n    fetch(`/api/users/${userId}`, {\n      method: 'POST',\n      body: JSON.stringify(user)\n    }).then(res => res.json()).then(data => setUser(data));\n  };\n\n  if (loading) return <div>Loading...</div>;\n  if (!user) return <div>No user found</div>;\n\n  return (\n    <div>\n      <h1>{user.name}</h1>\n      <p>{user.bio}</p>\n      <p>Email: {user.email}</p>\n      <button onClick={handleUpdate}>Update Profile</button>\n    </div>\n  );\n};\n```\n\nProvide a comprehensive review covering security, performance, style, and correctness.",
+      "expected_output": "Detailed review identifying: XSS vulnerability in bio rendering, missing error handling, missing dependency in useEffect, missing Content-Type header, performance issue with re-renders, email exposure concern"
+    },
+    {
+      "id": 2,
+      "prompt": "This code adds a new field to the Firebase database. Review it for database safety and compatibility:\n\n```typescript\n// mobile/src/services/userService.ts\nexport const updateUserProfile = async (userId: string, updates: any) => {\n  const userRef = db.collection('users').doc(userId);\n  \n  // Remove the 'lastLoginDevice' field as it's deprecated\n  await userRef.update({\n    ...updates,\n    lastLoginDevice: firebase.firestore.FieldValue.delete()\n  });\n};\n```\n\nAlso check mobile/CLOUD.md to understand the current database schema and flag any breaking changes.",
+      "expected_output": "Review identifying potential breaking changes to existing users, need to check CLOUD.md for lastLoginDevice usage, backward compatibility concerns, migration strategy recommendations"
+    },
+    {
+      "id": 3,
+      "prompt": "Review this TypeScript utility function for correctness and best practices:\n\n```typescript\n// web/src/utils/validators.ts\nexport function validateEmail(email: string): boolean {\n  return email.includes('@');\n}\n\nexport function calculateWorkoutStats(sets: any[]) {\n  let totalReps = 0;\n  for (let i = 0; i <= sets.length; i++) {\n    totalReps += sets[i].reps;\n  }\n  return totalReps;\n}\n\nexport function formatCurrency(amount) {\n  return '$' + amount;\n}\n\nconst users = ['alice', 'bob', 'charlie'];\nexport function findUser(name: string) {\n  for (let i = 0; i < users.length; i++) {\n    if (users[i] === name) return users[i];\n  }\n}\n```\n\nProvide a thorough review of logic errors, type safety, and best practices.",
+      "expected_output": "Review identifying: off-by-one error in calculateWorkoutStats, missing type annotations, insufficient email validation, array bounds error, formatting issues, missing error handling, immutability concerns"
+    },
+    {
+      "id": 4,
+      "prompt": "Review this NextJS API route for security and best practices:\n\n```typescript\n// web/src/pages/api/admin/users.ts\nimport { NextApiRequest, NextApiResponse } from 'next';\nimport db from '../../../lib/db';\n\nexport default async function handler(req: NextApiRequest, res: NextApiResponse) {\n  const { action, userId, role } = req.query;\n\n  if (action === 'setRole') {\n    await db.query(`UPDATE users SET role = '${role}' WHERE id = ${userId}`);\n    res.status(200).json({ success: true });\n  }\n\n  if (action === 'delete') {\n    await db.query(`DELETE FROM users WHERE id = ${userId}`);\n    res.status(200).json({ success: true });\n  }\n}\n```\n\nFocus on security vulnerabilities and API design issues.",
+      "expected_output": "Review identifying: SQL injection vulnerability, missing authentication check, missing authorization check, missing HTTP method validation, query parameter validation missing, error handling absent, no CSRF protection"
+    }
+  ]
+}
