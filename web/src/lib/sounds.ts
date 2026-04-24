@@ -64,3 +64,55 @@ export function playFinishBeep() {
   playTone(1046, 0.2, 0.4, "sine");
   setTimeout(() => playTone(1318, 0.3, 0.4, "sine"), 250);
 }
+
+/** Louder warning beep at 3, 2, 1 seconds left in prepare */
+export function playPrepareWarningBeep() {
+  playTone(1100, 0.15, 0.65, "square");
+}
+
+/** Warning beep 4–1 seconds before a rep boundary */
+export function playRepWarningBeep() {
+  playTone(880, 0.15, 0.5, "square");
+}
+
+/** Loud whistle: pea whistle with warbling/trilling effect */
+export function playWhistle() {
+  try {
+    const ctx = getAudioContext();
+    const osc = ctx.createOscillator();
+    const lfo = ctx.createOscillator();
+    const gain = ctx.createGain();
+    const lfoGain = ctx.createGain();
+
+    // Main oscillator - high pitched whistle
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(2800, ctx.currentTime);
+
+    // LFO for warble/trill effect (rapid frequency modulation)
+    lfo.type = "sine";
+    lfo.frequency.setValueAtTime(6, ctx.currentTime); // 6 Hz warble
+
+    // LFO gain to control depth of wobble
+    lfoGain.gain.setValueAtTime(350, ctx.currentTime); // 350 Hz depth
+
+    // Main volume envelope
+    gain.gain.setValueAtTime(0.85, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.7);
+
+    // Connect LFO to frequency for warble effect
+    lfo.connect(lfoGain);
+    lfoGain.connect(osc.frequency);
+
+    // Connect oscillator to gain
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+
+    osc.start(ctx.currentTime);
+    lfo.start(ctx.currentTime);
+
+    osc.stop(ctx.currentTime + 0.7);
+    lfo.stop(ctx.currentTime + 0.7);
+  } catch {
+    // Silently ignore – audio is non-critical
+  }
+}

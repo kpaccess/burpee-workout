@@ -9,6 +9,9 @@ import {
   playGoBeep,
   playRepBeep,
   playFinishBeep,
+  playPrepareWarningBeep,
+  playRepWarningBeep,
+  playWhistle,
 } from "../lib/sounds";
 
 const PREPARE_SECONDS = 10;
@@ -77,7 +80,7 @@ export function useWorkoutTimer({
 
     if (prepareSecondsLeft <= 0) {
       // Prepare done → GO!
-      playGoBeep();
+      playWhistle();
       setPhase("workout");
       setIsActive(true);
       return;
@@ -87,7 +90,11 @@ export function useWorkoutTimer({
       setPrepareSecondsLeft((prev) => {
         const next = prev - 1;
         if (next > 0) {
-          playCountdownTick();
+          if (next <= 3) {
+            playPrepareWarningBeep();
+          } else {
+            playCountdownTick();
+          }
         }
         return next;
       });
@@ -119,9 +126,34 @@ export function useWorkoutTimer({
             Math.floor(timeElapsed / intervalSeconds + REP_EPSILON),
           );
 
+          // Compute seconds until next rep boundary
+          const nextSecondsDone = totalSeconds - clampedNextValue;
+          const nextRepsCompleted = Math.min(
+            activeMode.goal,
+            Math.floor(nextSecondsDone / intervalSeconds + REP_EPSILON),
+          );
+          const secondsUntilBoundary =
+            nextRepsCompleted < activeMode.goal
+              ? Math.max(
+                  0,
+                  Math.ceil(
+                    (nextRepsCompleted + 1) * intervalSeconds - nextSecondsDone,
+                  ),
+                )
+              : null;
+
+          // Warning beeps 4–1 seconds before rep boundary
+          if (
+            secondsUntilBoundary !== null &&
+            secondsUntilBoundary >= 1 &&
+            secondsUntilBoundary <= 4
+          ) {
+            playRepWarningBeep();
+          }
+
           if (rep > previousRep) {
             setCurrentRep(rep);
-            playRepBeep();
+            playWhistle();
             onRepBoundaryRef.current?.(rep, activeMode.mode);
           }
         }

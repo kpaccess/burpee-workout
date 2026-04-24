@@ -16,6 +16,8 @@ interface UseWorkoutTimerOptions {
   onRepBoundary?: (rep: number, mode: WorkoutMode) => void;
   onPrepareTick?: () => void;
   onGo?: () => void;
+  onPrepareWarning?: () => void;
+  onRepWarning?: () => void;
 }
 
 export function useWorkoutTimer({
@@ -24,6 +26,8 @@ export function useWorkoutTimer({
   onRepBoundary,
   onPrepareTick,
   onGo,
+  onPrepareWarning,
+  onRepWarning,
 }: UseWorkoutTimerOptions) {
   const [selectedMode, setSelectedMode] = useState<WorkoutMode>(
     config.defaultMode,
@@ -38,13 +42,17 @@ export function useWorkoutTimer({
   const onRepBoundaryRef = useRef(onRepBoundary);
   const onPrepareTickRef = useRef(onPrepareTick);
   const onGoRef = useRef(onGo);
+  const onPrepareWarningRef = useRef(onPrepareWarning);
+  const onRepWarningRef = useRef(onRepWarning);
 
   useEffect(() => {
     onFinishRef.current = onFinish;
     onRepBoundaryRef.current = onRepBoundary;
     onPrepareTickRef.current = onPrepareTick;
     onGoRef.current = onGo;
-  }, [onFinish, onRepBoundary, onPrepareTick, onGo]);
+    onPrepareWarningRef.current = onPrepareWarning;
+    onRepWarningRef.current = onRepWarning;
+  }, [onFinish, onRepBoundary, onPrepareTick, onGo, onPrepareWarning, onRepWarning]);
 
   const totalSeconds = config.initialMinutes * 60;
   const mode = config.modes.some((entry) => entry.mode === selectedMode)
@@ -88,7 +96,11 @@ export function useWorkoutTimer({
       setPrepareSecondsLeft((prev) => {
         const next = prev - 1;
         if (next > 0) {
-          onPrepareTickRef.current?.();
+          if (next <= 3) {
+            onPrepareWarningRef.current?.();
+          } else {
+            onPrepareTickRef.current?.();
+          }
         }
         return next;
       });
@@ -119,6 +131,31 @@ export function useWorkoutTimer({
             activeMode.goal,
             Math.floor(timeElapsed / intervalSeconds + REP_EPSILON),
           );
+
+          // Compute seconds until next rep boundary
+          const nextSecondsDone = totalSeconds - clampedNextValue;
+          const nextRepsCompleted = Math.min(
+            activeMode.goal,
+            Math.floor(nextSecondsDone / intervalSeconds + REP_EPSILON),
+          );
+          const secondsUntilBoundary =
+            nextRepsCompleted < activeMode.goal
+              ? Math.max(
+                  0,
+                  Math.ceil(
+                    (nextRepsCompleted + 1) * intervalSeconds - nextSecondsDone,
+                  ),
+                )
+              : null;
+
+          // Warning beeps 4–1 seconds before rep boundary
+          if (
+            secondsUntilBoundary !== null &&
+            secondsUntilBoundary >= 1 &&
+            secondsUntilBoundary <= 4
+          ) {
+            onRepWarningRef.current?.();
+          }
 
           if (rep > previousRep) {
             setCurrentRep(rep);

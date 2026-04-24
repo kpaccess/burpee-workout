@@ -67,10 +67,15 @@ export const WorkoutTimer: React.FC<WorkoutTimerProps> = ({
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       playBeep(0.2); // Soft tick
     },
+    onPrepareWarning: () => {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      playBeep(0.6); // Noticeably louder than soft tick
+    },
     onGo: () => {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      playBeep(1.0); // Loud START
-      setTimeout(() => playBeep(1.0), 300); // Double loud beep for GO
+      playBeep(1.0);
+      setTimeout(() => playBeep(1.0), 150);
+      setTimeout(() => playBeep(1.0), 300); // Triple burst for whistle
     },
     onFinish: () => {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -80,7 +85,13 @@ export const WorkoutTimer: React.FC<WorkoutTimerProps> = ({
     },
     onRepBoundary: () => {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-      playBeep(1.0); // Loud rep boundary
+      playBeep(1.0);
+      setTimeout(() => playBeep(1.0), 150);
+      setTimeout(() => playBeep(1.0), 300); // Triple burst = whistle
+    },
+    onRepWarning: () => {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      playBeep(0.5);
     },
   });
 

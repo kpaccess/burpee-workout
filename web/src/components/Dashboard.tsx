@@ -94,6 +94,7 @@ export default function Dashboard({
   const startDate = new Date(userData.startDate);
   const milestoneDate = addMonths(startDate, 6);
   const today = new Date();
+  const todayStr = format(today, "yyyy-MM-dd");
 
   const isMilestoneReached = isAfter(today, milestoneDate) && !userData.endDate;
   const daysPassed = differenceInDays(today, startDate);
@@ -540,6 +541,7 @@ export default function Dashboard({
                 _dayName,
               );
               const isCurrentMonth = isSameMonth(dayObj, currentMonth);
+              const isPast = dateStr < todayStr;
 
               return (
                 <Box
@@ -577,6 +579,7 @@ export default function Dashboard({
                     >
                       <Checkbox
                         checked={isCompleted}
+                        disabled={isPast}
                         onChange={(e) => {
                           if (isCompleted) {
                             handleToggle(dateStr, true); // uncheck
@@ -604,6 +607,15 @@ export default function Dashboard({
                           align="center"
                         >
                           {formatWorkoutLogLabel(dayLog.levelCompleted)}
+                        </Typography>
+                      )}
+                      {isPast && !isCompleted && (
+                        <Typography
+                          variant="caption"
+                          sx={{ color: "#555", fontSize: "0.6rem", lineHeight: 1 }}
+                          align="center"
+                        >
+                          Missed
                         </Typography>
                       )}
                     </Box>
