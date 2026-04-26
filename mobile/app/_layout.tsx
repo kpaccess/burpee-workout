@@ -26,6 +26,10 @@ export default function RootLayout() {
             name="modal"
             options={{ presentation: "modal", title: "Modal" }}
           />
+          <Stack.Screen
+            name="pricing"
+            options={{ headerShown: false, presentation: "card" }}
+          />
         </Stack>
         <StatusBar style="auto" />
       </ThemeProvider>

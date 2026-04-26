@@ -12,6 +12,7 @@ import {
   Linking,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useRouter } from "expo-router";
 import {
   differenceInDays,
   addMonths,
@@ -49,6 +50,7 @@ import {
 import { WorkoutTimer } from "../../components/WorkoutTimer";
 
 export default function HomeScreen() {
+  const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [userData, setUserData] = useState<UserData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -483,9 +485,7 @@ export default function HomeScreen() {
 
               <TouchableOpacity
                 style={[styles.secondaryActionBtn, styles.landingSecondaryBtn]}
-                onPress={() =>
-                  Linking.openURL("https://burpeepacer.com/pricing")
-                }
+                onPress={() => router.push("/pricing")}
               >
                 <Text style={styles.secondaryActionBtnText}>
                   See Advanced Pricing
