@@ -39,7 +39,7 @@ import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
 import * as Haptics from "expo-haptics";
 import { Ionicons } from "@expo/vector-icons";
-import { auth } from "../../lib/firebase";
+import { auth, db } from "../../lib/firebase";
 import { getUserData, saveUserDataDB } from "../../lib/db";
 import {
   ADVANCED_LEVELS,
@@ -47,7 +47,9 @@ import {
   UserData,
   WorkoutLog,
   WorkoutTier,
+  isAllowlisted,
 } from "../../types";
+import { doc, onSnapshot } from "firebase/firestore";
 import { WorkoutTimer } from "../../components/WorkoutTimer";
 
 export default function HomeScreen() {
@@ -71,6 +73,7 @@ export default function HomeScreen() {
   // Onboarding Forms
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
   const [weight, setWeight] = useState("");
+  const [weightUnit, setWeightUnit] = useState<"kg" | "lb">("lb");
   const [day1PictureDraft, setDay1PictureDraft] = useState<string | null>(null);
   const [syncError, setSyncError] = useState("");
   const [selectedLevelId, setSelectedLevelId] = useState("1B");
@@ -93,24 +96,42 @@ export default function HomeScreen() {
   );
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (u) => {
+    let unsubSnapshot: (() => void) | null = null;
+
+    const unsubAuth = onAuthStateChanged(auth, (u) => {
+      if (unsubSnapshot) {
+        unsubSnapshot();
+        unsubSnapshot = null;
+      }
+
       setUser(u);
       if (u) {
-        try {
-          const ud = await getUserData(u.uid);
-          setUserData(ud || null);
-          setSyncError("");
-        } catch (e) {
-          console.error("Error fetching data:", e);
-          setSyncError("Failed to load your data from Firebase.");
-        }
+        setLoading(true);
+        const docRef = doc(db, "users", u.uid);
+        unsubSnapshot = onSnapshot(
+          docRef,
+          (snap) => {
+            setUserData(snap.exists() ? (snap.data() as UserData) : null);
+            setSyncError("");
+            setLoading(false);
+          },
+          (err) => {
+            console.error("Firestore listener error:", err);
+            setSyncError("Failed to load your data from Firebase.");
+            setLoading(false);
+          }
+        );
       } else {
         setUserData(null);
         setSyncError("");
+        setLoading(false);
       }
-      setLoading(false);
     });
-    return () => unsubscribe();
+
+    return () => {
+      unsubAuth();
+      if (unsubSnapshot) unsubSnapshot();
+    };
   }, []);
 
   const handleAuth = async () => {
@@ -172,6 +193,7 @@ export default function HomeScreen() {
       startPictureUrl: day1PictureDraft,
       currentLevelId: isBeginnerTrack ? "B1" : selectedLevelId,
       workoutTier: selectedWorkoutTier,
+      weightUnit: weightUnit,
       workoutLogs: [],
     };
     try {
@@ -728,14 +750,37 @@ export default function HomeScreen() {
             />
 
             <Text style={styles.sectionLabel}>Starting Weight</Text>
-            <TextInput
-              style={styles.input}
-              value={weight}
-              onChangeText={setWeight}
-              placeholder="Weight in lbs/kg"
-              placeholderTextColor="#666"
-              keyboardType="numeric"
-            />
+            <View style={styles.weightRow}>
+              <TextInput
+                style={[styles.input, { flex: 1, marginRight: 12 }]}
+                value={weight}
+                onChangeText={setWeight}
+                placeholder="Enter weight"
+                placeholderTextColor="#666"
+                keyboardType="numeric"
+              />
+              <View style={styles.unitToggle}>
+                {(["kg", "lb"] as const).map((unit) => (
+                  <TouchableOpacity
+                    key={unit}
+                    style={[
+                      styles.unitBtn,
+                      weightUnit === unit && styles.unitBtnActive,
+                    ]}
+                    onPress={() => setWeightUnit(unit)}
+                  >
+                    <Text
+                      style={[
+                        styles.unitBtnText,
+                        weightUnit === unit && styles.unitBtnTextActive,
+                      ]}
+                    >
+                      {unit}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
 
             <Text style={styles.sectionLabel}>Workout Type</Text>
             <View style={styles.tierRow}>
@@ -879,6 +924,17 @@ export default function HomeScreen() {
   const isBeginnerTrack = !isAdvancedTrack;
   const levelsForTrack = isAdvancedTrack ? ADVANCED_LEVELS : BEGINNER_LEVELS;
 
+  // Compute Pro status: subscription OR trial OR allowlist
+  const trialEndsAt = userData.trialEndsAt;
+  const isTrialActive =
+    typeof trialEndsAt === "string" &&
+    Number.isFinite(Date.parse(trialEndsAt)) &&
+    Date.now() < Date.parse(trialEndsAt);
+  const isPro =
+    userData.isPro === true ||
+    isTrialActive ||
+    isAllowlisted(user?.email);
+
   // --- 3. AUTHENTICATED WITH DATA: Show Dashboard ---
   const startDate = new Date(userData.startDate);
   const daysPassed = Math.max(0, differenceInDays(new Date(), startDate));
@@ -943,6 +999,21 @@ export default function HomeScreen() {
               <Text style={styles.primaryActionBtnText}>Complete Check-In</Text>
             </TouchableOpacity>
           </View>
+        ) : null}
+
+        {isAdvancedTrack && !isPro ? (
+          <TouchableOpacity
+            style={styles.upgradePromoBanner}
+            onPress={() => router.push("/pricing")}
+          >
+            <View>
+              <Text style={styles.upgradePromoTitle}>⭐ Unlock Pro Features</Text>
+              <Text style={styles.upgradePromoText}>
+                Get access to advanced stats, data export, and more for just $4.99/month
+              </Text>
+            </View>
+            <Text style={styles.upgradePromoArrow}>→</Text>
+          </TouchableOpacity>
         ) : null}
 
         {/* Stats Grid */}
@@ -1516,8 +1587,16 @@ export default function HomeScreen() {
               style={[
                 styles.workoutOptionBtn,
                 workoutTier === "advanced" && { borderColor: "#00E5FF", backgroundColor: "rgba(0,229,255,0.08)" },
+                !isPro && { opacity: 0.5 },
               ]}
-              onPress={() => handleSwitchProgram("advanced")}
+              onPress={() => {
+                if (!isPro) {
+                  setShowSwitchProgramModal(false);
+                  router.push("/pricing");
+                  return;
+                }
+                handleSwitchProgram("advanced");
+              }}
             >
               <View style={[styles.optionIconBox, { backgroundColor: "rgba(0, 229, 255, 0.1)" }]}>
                 <Ionicons name="flash-outline" size={24} color="#00E5FF" />
@@ -1526,9 +1605,14 @@ export default function HomeScreen() {
                 <Text style={styles.optionTitle}>Advanced</Text>
                 <Text style={styles.optionDesc}>Navy Seals + 6-counts · 1A–Grad</Text>
               </View>
-              {workoutTier === "advanced" && (
-                <Ionicons name="checkmark-circle" size={20} color="#00E5FF" style={{ marginLeft: "auto" }} />
-              )}
+              <View style={{ marginLeft: "auto", flexDirection: "row", alignItems: "center", gap: 8 }}>
+                {!isPro && (
+                  <Text style={{ color: "#f59e0b", fontSize: 11, fontWeight: "600" }}>PRO</Text>
+                )}
+                {workoutTier === "advanced" && (
+                  <Ionicons name="checkmark-circle" size={20} color="#00E5FF" />
+                )}
+              </View>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -1666,6 +1750,37 @@ const styles = StyleSheet.create({
     borderColor: "#222",
     borderWidth: 1,
   },
+  weightRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 16,
+    gap: 8,
+  },
+  unitToggle: {
+    flexDirection: "row",
+    backgroundColor: "#000",
+    borderColor: "#222",
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 4,
+    gap: 4,
+  },
+  unitBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  unitBtnActive: {
+    backgroundColor: "#00E5FF",
+  },
+  unitBtnText: {
+    color: "#666",
+    fontWeight: "600",
+    fontSize: 13,
+  },
+  unitBtnTextActive: {
+    color: "#000",
+  },
   authMessageText: {
     color: "#7CFFB2",
     marginBottom: 10,
@@ -1729,6 +1844,34 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   milestoneText: { color: "#ccc", lineHeight: 20 },
+  upgradePromoBanner: {
+    backgroundColor: "rgba(245,158,11,0.15)",
+    borderColor: "#f59e0b",
+    borderWidth: 1,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 24,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  upgradePromoTitle: {
+    color: "#f59e0b",
+    fontWeight: "800",
+    fontSize: 16,
+    marginBottom: 4,
+  },
+  upgradePromoText: {
+    color: "#ccc",
+    fontSize: 13,
+    lineHeight: 18,
+    maxWidth: "85%",
+  },
+  upgradePromoArrow: {
+    color: "#f59e0b",
+    fontSize: 20,
+    fontWeight: "700",
+  },
   statsCard: {
     backgroundColor: "#111",
     padding: 20,

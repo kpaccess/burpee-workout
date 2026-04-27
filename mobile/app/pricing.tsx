@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -6,8 +6,15 @@ import {
   TouchableOpacity,
   StyleSheet,
   SafeAreaView,
+  ActivityIndicator,
+  Alert,
 } from "react-native";
 import { useRouter } from "expo-router";
+import { openAuthSessionAsync } from "expo-web-browser";
+import { onAuthStateChanged, User } from "firebase/auth";
+import { doc, onSnapshot } from "firebase/firestore";
+import { auth, db } from "../lib/firebase";
+import { UserData } from "../types";
 
 const PRO_FEATURES = [
   "Full calendar history (all time)",
@@ -30,6 +37,85 @@ const TRUST_BADGES = [
 
 export default function PricingScreen() {
   const router = useRouter();
+  const [user, setUser] = useState<User | null>(null);
+  const [isPro, setIsPro] = useState(false);
+  const [authReady, setAuthReady] = useState(false);
+  const [loadingCheckout, setLoadingCheckout] = useState(false);
+
+  useEffect(() => {
+    let unsubSnapshot: (() => void) | null = null;
+
+    const unsubAuth = onAuthStateChanged(auth, (u) => {
+      if (unsubSnapshot) {
+        unsubSnapshot();
+        unsubSnapshot = null;
+      }
+      setUser(u);
+      setAuthReady(true);
+      if (u && db) {
+        unsubSnapshot = onSnapshot(doc(db, "users", u.uid), (snap) => {
+          if (snap.exists()) {
+            const data = snap.data() as UserData;
+            const trialActive =
+              typeof data.trialEndsAt === "string" &&
+              Date.now() < Date.parse(data.trialEndsAt);
+            setIsPro(data.isPro === true || trialActive);
+          } else {
+            setIsPro(false);
+          }
+        });
+      } else {
+        setIsPro(false);
+      }
+    });
+
+    return () => {
+      unsubAuth();
+      if (unsubSnapshot) unsubSnapshot();
+    };
+  }, []);
+
+  const handleUpgrade = async () => {
+    if (!user) {
+      router.push("/");
+      return;
+    }
+    if (isPro) return;
+
+    const webUrl = process.env.EXPO_PUBLIC_WEB_URL;
+    if (!webUrl) {
+      Alert.alert("Configuration error", "Web URL not configured.");
+      return;
+    }
+
+    setLoadingCheckout(true);
+    try {
+      const resp = await fetch(`${webUrl}/api/stripe/checkout`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: user.uid,
+          userEmail: user.email,
+          successUrl: "burpeepacer://payment-success",
+          cancelUrl: "burpeepacer://pricing",
+        }),
+      });
+
+      if (!resp.ok) {
+        const body = await resp.json().catch(() => ({}));
+        throw new Error(body.error ?? `HTTP ${resp.status}`);
+      }
+
+      const { url } = await resp.json();
+      if (!url) throw new Error("No checkout URL returned");
+
+      const result = await openAuthSessionAsync(url, "burpeepacer://");
+    } catch (err: any) {
+      Alert.alert("Checkout error", err.message ?? "Something went wrong.");
+    } finally {
+      setLoadingCheckout(false);
+    }
+  };
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -93,10 +179,19 @@ export default function PricingScreen() {
               </View>
             ))}
             <TouchableOpacity
-              style={styles.upgradeBtn}
-              onPress={() => router.back()}
+              style={[styles.upgradeBtn, (loadingCheckout || isPro) && { opacity: 0.7 }]}
+              onPress={handleUpgrade}
+              disabled={loadingCheckout || isPro}
             >
-              <Text style={styles.upgradeBtnText}>⭐ Sign in to Unlock Advanced</Text>
+              {loadingCheckout ? (
+                <ActivityIndicator color="#fff" />
+              ) : isPro ? (
+                <Text style={styles.upgradeBtnText}>✓ You are on Pro</Text>
+              ) : !authReady || !user ? (
+                <Text style={styles.upgradeBtnText}>⭐ Sign in to Unlock Advanced</Text>
+              ) : (
+                <Text style={styles.upgradeBtnText}>⭐ Upgrade to Advanced — $4.99/mo</Text>
+              )}
             </TouchableOpacity>
           </View>
         </View>

@@ -1,5 +1,28 @@
 export type WorkoutTier = "beginner" | "advanced";
 
+// Friends & family allowlist for free Pro access (mirror of web/src/lib/allowlist.ts)
+const ALLOWLISTED_EMAILS: string[] = [
+  "kpaccess@gmail.com",
+  "ratheeshbabukp123@gmail.com",
+  "eartharoma60@gmail.com",
+  "hassank15@gmail.com",
+  "shareengill@gmail.com",
+  "admin@gmail.com",
+  "ukpslg09@gmail.com",
+  "tamilintcs@gmail.com",
+  "berikivinod@gmail.com",
+  "bethapudi.s@gmail.com",
+  "prynkapradhan93@gmail.com",
+  "pryapradhan93@gmail.com",
+  "chetankrpradhan96@gmail.com",
+  "gudiwadaneeraja@gmail.com",
+];
+
+export function isAllowlisted(email: string | null | undefined): boolean {
+  if (!email) return false;
+  return ALLOWLISTED_EMAILS.includes(email.toLowerCase());
+}
+
 export interface WorkoutLog {
   date: string; // YYYY-MM-DD
   completed: boolean;
@@ -14,6 +37,8 @@ export interface UserData {
   startWeight: number;
   startPictureUrl: string | null;
   workoutTier?: WorkoutTier;
+  trialEndsAt?: string;
+  weightUnit?: "kg" | "lb";
 
   endDate?: string;
   endWeight?: number;
@@ -22,6 +47,12 @@ export interface UserData {
   isGraduated?: boolean;
   workoutLogs?: WorkoutLog[];
   currentLevelId?: string;
+
+  // Stripe subscription
+  isPro?: boolean;
+  stripeCustomerId?: string;
+  stripeSubscriptionId?: string;
+  subscriptionStatus?: "active" | "canceled" | "past_due" | "trialing";
 }
 
 export interface LevelDescription {

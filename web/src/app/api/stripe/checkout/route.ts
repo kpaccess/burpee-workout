@@ -3,7 +3,7 @@ import stripe from "@/lib/stripe";
 
 export async function POST(req: NextRequest) {
   try {
-    const { userId, userEmail } = await req.json();
+    const { userId, userEmail, successUrl: customSuccessUrl, cancelUrl: customCancelUrl } = await req.json();
 
     const priceId = process.env.STRIPE_PRO_PRICE_ID;
     if (!priceId) {
@@ -17,8 +17,8 @@ export async function POST(req: NextRequest) {
     const { origin } = new URL(req.url);
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || origin;
 
-    const successUrl = `${baseUrl}/success?session_id={CHECKOUT_SESSION_ID}`;
-    const cancelUrl = `${baseUrl}/pricing`;
+    const successUrl = customSuccessUrl ?? `${baseUrl}/success?session_id={CHECKOUT_SESSION_ID}`;
+    const cancelUrl = customCancelUrl ?? `${baseUrl}/pricing`;
 
     // Build session differently depending on whether the user is already logged in.
     // Avoids conditional spread, which can break Stripe's strict TS types.
