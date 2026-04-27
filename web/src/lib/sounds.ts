@@ -116,3 +116,37 @@ export function playWhistle() {
     // Silently ignore – audio is non-critical
   }
 }
+
+/** Triple-blast whistle for workout completion */
+export function playFinishWhistle() {
+  try {
+    const ctx = getAudioContext();
+
+    const playBlast = (delay: number, duration: number) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(3200, ctx.currentTime + delay);
+
+      gain.gain.setValueAtTime(0.9, ctx.currentTime + delay);
+      gain.gain.exponentialRampToValueAtTime(
+        0.001,
+        ctx.currentTime + delay + duration,
+      );
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.start(ctx.currentTime + delay);
+      osc.stop(ctx.currentTime + delay + duration);
+    };
+
+    // Three quick blasts
+    playBlast(0, 0.3);
+    playBlast(0.4, 0.3);
+    playBlast(0.8, 0.4);
+  } catch {
+    // Silently ignore – audio is non-critical
+  }
+}

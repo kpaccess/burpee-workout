@@ -9,6 +9,7 @@ import {
   playGoBeep,
   playRepBeep,
   playFinishBeep,
+  playFinishWhistle,
   playPrepareWarningBeep,
   playRepWarningBeep,
   playWhistle,
@@ -161,7 +162,7 @@ export function useWorkoutTimer({
         if (clampedNextValue === 0) {
           setIsActive(false);
           setPhase("done");
-          playFinishBeep();
+          playFinishWhistle();
           onFinishRef.current?.();
         }
 
