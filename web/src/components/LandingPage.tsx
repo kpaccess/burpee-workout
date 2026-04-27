@@ -160,7 +160,10 @@ export default function LandingPage() {
                 variant="text"
                 size="large"
                 onClick={() => router.push("/login")}
-                sx={{ color: "rgba(255,255,255,0.76)" }}
+                sx={{
+                  color: "rgba(255,255,255,0.76)",
+                  whiteSpace: "nowrap",
+                }}
               >
                 Already a member? Sign in
               </Button>

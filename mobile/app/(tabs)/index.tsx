@@ -30,6 +30,7 @@ import {
   onAuthStateChanged,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
+  sendPasswordResetEmail,
   updateProfile,
   signOut,
   User,
@@ -64,6 +65,7 @@ export default function HomeScreen() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [authError, setAuthError] = useState("");
+  const [authMessage, setAuthMessage] = useState("");
   const [isAuthenticating, setIsAuthenticating] = useState(false);
 
   // Onboarding Forms
@@ -113,6 +115,7 @@ export default function HomeScreen() {
 
   const handleAuth = async () => {
     setAuthError("");
+    setAuthMessage("");
     setIsAuthenticating(true);
     try {
       if (isLoginFlow) {
@@ -131,9 +134,28 @@ export default function HomeScreen() {
     }
   };
 
+  const handleResetPassword = async () => {
+    setAuthError("");
+    setAuthMessage("");
+    const normalizedEmail = email.trim();
+    if (!normalizedEmail) {
+      setAuthError("Please enter your email address above to reset your password.");
+      return;
+    }
+    try {
+      await sendPasswordResetEmail(auth, normalizedEmail);
+      setAuthMessage(
+        "If an account exists for that email, a password reset link will be sent. Check your inbox and spam folder.",
+      );
+    } catch (err: any) {
+      setAuthError(err.message);
+    }
+  };
+
   const openAuthForm = (mode: "login" | "signup") => {
     setIsLoginFlow(mode === "login");
     setAuthError("");
+    setAuthMessage("");
     setShowAuthForm(true);
   };
 
@@ -496,7 +518,7 @@ export default function HomeScreen() {
                 onPress={() => openAuthForm("login")}
                 style={styles.landingTextAction}
               >
-                <Text style={styles.landingTextActionLabel}>
+                <Text style={styles.landingTextActionLabel} numberOfLines={1}>
                   Already a member? Sign in
                 </Text>
               </TouchableOpacity>
@@ -539,6 +561,7 @@ export default function HomeScreen() {
               onPress={() => {
                 setShowAuthForm(false);
                 setAuthError("");
+                setAuthMessage("");
               }}
               style={styles.authBackBtn}
             >
@@ -559,6 +582,9 @@ export default function HomeScreen() {
               >
                 {authError}
               </Text>
+            ) : null}
+            {authMessage ? (
+              <Text style={styles.authMessageText}>{authMessage}</Text>
             ) : null}
             {!isLoginFlow && (
               <View style={{ flexDirection: "row", gap: 10 }}>
@@ -618,12 +644,22 @@ export default function HomeScreen() {
                 </Text>
               )}
             </TouchableOpacity>
+            {isLoginFlow && (
+              <TouchableOpacity
+                onPress={handleResetPassword}
+                disabled={isAuthenticating}
+                style={styles.forgotPasswordBtn}
+              >
+                <Text style={styles.forgotPasswordText}>Forgot password?</Text>
+              </TouchableOpacity>
+            )}
             <TouchableOpacity
               onPress={() => {
                 setIsLoginFlow(!isLoginFlow);
                 setFirstName("");
                 setLastName("");
                 setAuthError("");
+                setAuthMessage("");
               }}
               style={{ marginTop: 20 }}
             >
@@ -1629,6 +1665,19 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     borderColor: "#222",
     borderWidth: 1,
+  },
+  authMessageText: {
+    color: "#7CFFB2",
+    marginBottom: 10,
+    textAlign: "center",
+  },
+  forgotPasswordBtn: {
+    alignSelf: "center",
+    marginTop: 14,
+  },
+  forgotPasswordText: {
+    color: "#00E5FF",
+    fontWeight: "600",
   },
   sectionLabel: {
     color: "#666",

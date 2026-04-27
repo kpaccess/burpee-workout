@@ -129,13 +129,16 @@ export default function Login({ onBackToInfo }: LoginProps) {
     setError("");
     setMessage("");
     if (!auth) return;
-    if (!email) {
+    const normalizedEmail = email.trim();
+    if (!normalizedEmail) {
       setError("Please enter your email address above to reset your password.");
       return;
     }
     try {
-      await sendPasswordResetEmail(auth, email);
-      setMessage("Password reset email sent! Check your inbox.");
+      await sendPasswordResetEmail(auth, normalizedEmail);
+      setMessage(
+        "If an account exists for that email, a password reset link will be sent. Check your inbox and spam folder.",
+      );
     } catch (err) {
       setError((err as Error).message);
     }
@@ -346,8 +349,13 @@ export default function Login({ onBackToInfo }: LoginProps) {
 
         {isLogin && (
           <Box display="flex" justifyContent="center" mb={1} mt={1}>
-            <Button variant="text" size="small" onClick={handleResetPassword}>
-              Forgot Password?
+            <Button
+              variant="text"
+              size="small"
+              onClick={handleResetPassword}
+              disabled={isLoading}
+            >
+              Forgot password?
             </Button>
           </Box>
         )}
