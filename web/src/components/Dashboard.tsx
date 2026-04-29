@@ -55,6 +55,7 @@ interface DashboardProps {
     dateStr: string,
     completed: boolean,
     type?: "N" | "C",
+    repsCompleted?: number,
   ) => void;
   onUpdateData?: (data: Partial<UserData>) => void;
   syncError?: string | null;
@@ -466,6 +467,12 @@ export default function Dashboard({
               sealsGoal={currentLevel?.seals ?? 0}
               sixCountsGoal={currentLevel?.sixCounts ?? 0}
               onOpenVideo={() => setOpenVideo(true)}
+              onFinish={(repsCompleted, mode) => {
+                if (onToggleWorkout) {
+                  const modeType = mode === "N" ? "N" : "C";
+                  onToggleWorkout(todayStr, true, modeType, repsCompleted);
+                }
+              }}
             />
           </Grid>
         </Grid>

@@ -72,6 +72,7 @@ export function useUserData() {
     dateStr: string,
     completed: boolean,
     type?: "N" | "C",
+    repsCompleted?: number,
   ) => {
     if (!user || !userData) return;
     const normalizedDate = toDateKey(dateStr);
@@ -118,10 +119,16 @@ export function useUserData() {
       } else {
         delete (logs[idx] as PersistedWorkoutLog).workoutType;
       }
+      if (repsCompleted !== undefined) {
+        logs[idx].repsCompleted = repsCompleted;
+      } else {
+        delete logs[idx].repsCompleted;
+      }
     } else {
       const newLog: PersistedWorkoutLog = { date: normalizedDate, completed };
       if (levelCompleted) newLog.levelCompleted = levelCompleted;
       if (workoutType) newLog.workoutType = workoutType;
+      if (repsCompleted !== undefined) newLog.repsCompleted = repsCompleted;
       logs.push(newLog);
     }
 
@@ -132,6 +139,7 @@ export function useUserData() {
       ...(log.levelCompleted ? { levelCompleted: log.levelCompleted } : {}),
       ...(log.workoutType ? { workoutType: log.workoutType } : {}),
       ...(log.notes ? { notes: log.notes } : {}),
+      ...(log.repsCompleted !== undefined ? { repsCompleted: log.repsCompleted } : {}),
     }));
 
     try {

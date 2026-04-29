@@ -18,7 +18,7 @@ interface WorkoutTimerProps {
   tier: WorkoutTier;
   sealsGoal?: number;
   sixCountsGoal?: number;
-  onFinish?: () => void;
+  onFinish?: (repsCompleted: number, mode: string) => void;
   onOpenVideo?: () => void;
 }
 

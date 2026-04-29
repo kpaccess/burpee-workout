@@ -9,6 +9,7 @@ export interface WorkoutLog {
    */
   workoutType?: "with_pushups" | "no_pushups";
   notes?: string;
+  repsCompleted?: number; // only set when auto-logged via the session timer
 }
 
 export type WorkoutTier = "beginner" | "advanced";

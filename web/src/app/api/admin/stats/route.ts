@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminDb, getAdminApp } from "@/lib/firebase-admin";
-import { ADMIN_EMAIL } from "@/lib/allowlist";
+import { isAdmin } from "@/lib/allowlist";
 import { getAuth } from "firebase-admin/auth";
 
 export interface UserRow {
@@ -15,11 +15,14 @@ export interface UserRow {
   level: string;
   startDate: string;
   onboarded: boolean;
+  workoutsCompleted: number;
+  timerVerified: number;
 }
 
 export interface AdminStats {
   pageViews: number;
   signupCount: number;
+  dailyViews: Record<string, number>;
   users: UserRow[];
 }
 
@@ -38,7 +41,7 @@ export async function GET(req: NextRequest) {
     }
 
     const decoded = await getAuth(getAdminApp()).verifyIdToken(idToken);
-    if (decoded.email?.toLowerCase() !== ADMIN_EMAIL.toLowerCase()) {
+    if (!isAdmin(decoded.email)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
@@ -50,9 +53,9 @@ export async function GET(req: NextRequest) {
       auth.listUsers(1000),
     ]);
 
-    const pageViews: number = statsSnap.exists
-      ? (statsSnap.data()?.pageViews ?? 0)
-      : 0;
+    const statsData = statsSnap.exists ? (statsSnap.data() ?? {}) : {};
+    const pageViews: number = statsData.pageViews ?? 0;
+    const dailyViews: Record<string, number> = statsData.dailyViews ?? {};
 
     // Fetch all user Firestore docs in parallel
     const authUsers = authResult.users;
@@ -77,6 +80,12 @@ export async function GET(req: NextRequest) {
         level: data.currentLevelId ?? "",
         startDate: data.startDate ?? "",
         onboarded: !!data.startDate,
+        workoutsCompleted: ((data.workoutLogs ?? []) as { completed?: boolean }[]).filter(
+          (l) => l.completed
+        ).length,
+        timerVerified: ((data.workoutLogs ?? []) as { completed?: boolean; repsCompleted?: number }[]).filter(
+          (l) => l.completed && l.repsCompleted !== undefined
+        ).length,
       };
     });
 
@@ -88,7 +97,7 @@ export async function GET(req: NextRequest) {
     );
     users.forEach((u, i) => { u.serialNo = i + 1; });
 
-    return NextResponse.json({ pageViews, signupCount: authUsers.length, users });
+    return NextResponse.json({ pageViews, signupCount: authUsers.length, dailyViews, users });
   } catch (err) {
     console.error("Error fetching admin stats:", err);
     return NextResponse.json(

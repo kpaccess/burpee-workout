@@ -11,10 +11,9 @@ export async function POST() {
   try {
     const db = getAdminDb();
     const statsRef = db.collection("analytics").doc("stats");
-    await statsRef.set(
-      { pageViews: FieldValue.increment(1) },
-      { merge: true },
-    );
+    const today = new Date().toISOString().slice(0, 10);
+    await statsRef.set({ pageViews: FieldValue.increment(1) }, { merge: true });
+    await statsRef.update({ [`dailyViews.${today}`]: FieldValue.increment(1) });
     return NextResponse.json({ ok: true });
   } catch (err) {
     console.error("Error recording page view:", err);

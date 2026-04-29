@@ -45,8 +45,8 @@ export default function AdminPage() {
         });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data: AdminStats = await res.json();
-        // Ensure users array always exists
         data.users = data.users ?? [];
+        data.dailyViews = data.dailyViews ?? {};
         setStats(data);
       } catch (e) {
         setError(String(e));
@@ -124,6 +124,38 @@ export default function AdminPage() {
         />
       </Box>
 
+      {/* Daily views */}
+      <Typography variant="h6" fontWeight={800} mb={2}>
+        Visits by Day
+      </Typography>
+      <TableContainer component={Paper} sx={{ bgcolor: "#141414", mb: 6, maxWidth: 400 }}>
+        <Table size="small">
+          <TableHead>
+            <TableRow>
+              <TableCell sx={(theme) => ({ fontWeight: theme.typography.fontWeightBold, color: "text.secondary" })}>Date</TableCell>
+              <TableCell sx={(theme) => ({ fontWeight: theme.typography.fontWeightBold, color: "text.secondary" })} align="right">Views</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {Object.entries(stats!.dailyViews ?? {})
+              .sort(([a], [b]) => b.localeCompare(a))
+              .map(([date, count]) => (
+                <TableRow key={date} hover>
+                  <TableCell sx={{ color: "text.secondary", fontSize: 12 }}>{date}</TableCell>
+                  <TableCell align="right">{count}</TableCell>
+                </TableRow>
+              ))}
+            {Object.keys(stats!.dailyViews ?? {}).length === 0 && (
+              <TableRow>
+                <TableCell colSpan={2}>
+                  <Typography variant="caption" color="text.disabled">No daily data yet — will accumulate from new visits.</Typography>
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </TableContainer>
+
       {/* Users table */}
       <Typography variant="h6" fontWeight={800} mb={2}>
         Users
@@ -140,6 +172,9 @@ export default function AdminPage() {
               <TableCell sx={(theme) => ({ fontWeight: theme.typography.fontWeightBold, color: "text.secondary" })}>Last Login</TableCell>
               <TableCell sx={(theme) => ({ fontWeight: theme.typography.fontWeightBold, color: "text.secondary" })}>Tier</TableCell>
               <TableCell sx={(theme) => ({ fontWeight: theme.typography.fontWeightBold, color: "text.secondary" })}>Level</TableCell>
+              <TableCell sx={(theme) => ({ fontWeight: theme.typography.fontWeightBold, color: "text.secondary" })}>Day</TableCell>
+              <TableCell sx={(theme) => ({ fontWeight: theme.typography.fontWeightBold, color: "text.secondary" })}>Workouts</TableCell>
+              <TableCell sx={(theme) => ({ fontWeight: theme.typography.fontWeightBold, color: "text.secondary" })}>Timer Verified</TableCell>
               <TableCell sx={(theme) => ({ fontWeight: theme.typography.fontWeightBold, color: "text.secondary" })}>Onboarded</TableCell>
               <TableCell sx={(theme) => ({ fontWeight: theme.typography.fontWeightBold, color: "text.secondary" })}>Pro</TableCell>
             </TableRow>
@@ -171,6 +206,21 @@ export default function AdminPage() {
                 </TableCell>
                 <TableCell>
                   <Typography variant="body2">{u.level || "—"}</Typography>
+                </TableCell>
+                <TableCell sx={{ whiteSpace: "nowrap", color: "text.secondary", fontSize: 12 }}>
+                  {getCurrentDay(u.startDate)}
+                </TableCell>
+                <TableCell>
+                  <Typography variant="body2">
+                    {u.workoutsCompleted > 0 ? u.workoutsCompleted : "—"}
+                  </Typography>
+                </TableCell>
+                <TableCell>
+                  {u.timerVerified > 0 ? (
+                    <Chip label={u.timerVerified} size="small" color="success" sx={{ fontSize: 11 }} />
+                  ) : (
+                    <Typography variant="caption" color="text.disabled">—</Typography>
+                  )}
                 </TableCell>
                 <TableCell>
                   <Chip
@@ -226,4 +276,12 @@ function formatDate(dateStr: string): string {
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+function getCurrentDay(startDate: string): string {
+  if (!startDate) return "—";
+  const diffMs = Date.now() - new Date(startDate).getTime();
+  const day = Math.floor(diffMs / (1000 * 60 * 60 * 24)) + 1;
+  if (day < 1 || day > 60) return "—";
+  return `Day ${day}`;
 }
