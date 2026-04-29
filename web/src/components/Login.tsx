@@ -29,13 +29,39 @@ import { useRouter } from "next/navigation";
 // directly to Firestore (those fields are protected by security rules).
 async function claimPendingSubscription(uid: string, email: string) {
   try {
-    await fetch("/api/claim-subscription", {
+    const res = await fetch("/api/claim-subscription", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ uid, email }),
     });
+    if (!res.ok) {
+      console.warn(`Failed to claim subscription: ${res.status} ${res.statusText}`);
+    }
   } catch (err) {
     console.error("Failed to claim pending subscription:", err);
+  }
+}
+
+async function sendWelcomeEmail(uid: string, email: string) {
+  try {
+    const res = await fetch("/api/send-welcome-email", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ uid, email }),
+    });
+    if (!res.ok) {
+      console.warn(`Failed to send welcome email: ${res.status} ${res.statusText}`);
+      return false;
+    }
+    const data = await res.json();
+    if (!data.sent) {
+      console.warn(`Welcome email not sent: ${data.reason}`);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error("Error sending welcome email:", err);
+    return false;
   }
 }
 
@@ -87,11 +113,13 @@ export default function Login({ onBackToInfo }: LoginProps) {
         if (displayName) {
           await updateProfile(credential.user, { displayName });
         }
-        fetch("/api/send-welcome-email", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ uid: credential.user.uid, email }),
-        }).catch(() => {});
+        const emailSent = await sendWelcomeEmail(credential.user.uid, email);
+        if (!emailSent) {
+          console.warn("Welcome email failed to send during signup");
+          setMessage(
+            "Account created! We had trouble sending your welcome email — please check your inbox and spam folder.",
+          );
+        }
       }
 
       // If the user paid via Stripe before creating an account, link the

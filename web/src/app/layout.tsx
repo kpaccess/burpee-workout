@@ -21,6 +21,22 @@ export const metadata: Metadata = {
   title: "BurpeePacer | The Elite Burpee Tracker",
   description:
     "The official BurpeePacer app. Track your landmarks, set your pace, and master the Busy People Program.",
+  openGraph: {
+    title: "BurpeePacer | The Elite Burpee Tracker",
+    description:
+      "The official BurpeePacer app. Track your landmarks, set your pace, and master the Busy People Program.",
+    url: "https://burpeepacers.com",
+    siteName: "BurpeePacer",
+    images: [{ url: "/opengraph-image.png", width: 1024, height: 1024 }],
+    type: "website",
+  },
+  twitter: {
+    card: "summary",
+    title: "BurpeePacer | The Elite Burpee Tracker",
+    description:
+      "The official BurpeePacer app. Track your landmarks, set your pace, and master the Busy People Program.",
+    images: ["/opengraph-image.png"],
+  },
 };
 
 export default function RootLayout({
