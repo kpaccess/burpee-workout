@@ -11,6 +11,7 @@ import {
   InputAdornment,
   IconButton,
   CircularProgress,
+  Divider,
 } from "@mui/material";
 import { Visibility, VisibilityOff } from "@mui/icons-material";
 import { motion } from "framer-motion";
@@ -19,6 +20,9 @@ import {
   createUserWithEmailAndPassword,
   sendPasswordResetEmail,
   updateProfile,
+  signInWithPopup,
+  GoogleAuthProvider,
+  getAdditionalUserInfo,
 } from "firebase/auth";
 import { auth, missingFirebaseEnvVars } from "../lib/firebase";
 import { useRouter } from "next/navigation";
@@ -88,6 +92,7 @@ export default function Login({ onBackToInfo }: LoginProps) {
   );
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -172,6 +177,58 @@ export default function Login({ onBackToInfo }: LoginProps) {
     }
   };
 
+  const handleGoogleSignIn = async () => {
+    setError("");
+    setIsGoogleLoading(true);
+
+    if (!auth) {
+      setError(
+        `Firebase is not configured. Missing env vars: ${missingFirebaseEnvVars.join(", ")}`,
+      );
+      setIsGoogleLoading(false);
+      return;
+    }
+
+    try {
+      const provider = new GoogleAuthProvider();
+      const credential = await signInWithPopup(auth, provider);
+      const isNewUser = getAdditionalUserInfo(credential)?.isNewUser ?? false;
+
+      if (isNewUser) {
+        await sendWelcomeEmail(credential.user.uid, credential.user.email!);
+      }
+
+      // Always attempt claim — safe no-op if no pending subscription exists.
+      await claimPendingSubscription(credential.user.uid, credential.user.email!);
+
+      const nextPath =
+        typeof window !== "undefined"
+          ? new URLSearchParams(window.location.search).get("next")
+          : null;
+      router.push(nextPath?.startsWith("/") ? nextPath : "/");
+      // Keep loading state active — page navigates away.
+    } catch (err) {
+      const code = (err as { code?: string }).code ?? "";
+      if (
+        code === "auth/popup-closed-by-user" ||
+        code === "auth/cancelled-popup-request"
+      ) {
+        // User dismissed popup — not an error.
+      } else if (code === "auth/account-exists-with-different-credential") {
+        setError(
+          "An account already exists with this email using a different sign-in method. Try signing in with your email and password instead.",
+        );
+      } else if (code === "auth/popup-blocked") {
+        setError(
+          "The sign-in popup was blocked by your browser. Please allow popups for this site and try again.",
+        );
+      } else {
+        setError((err as Error).message);
+      }
+      setIsGoogleLoading(false);
+    }
+  };
+
   return (
     <Box
       component={motion.div}
@@ -224,6 +281,45 @@ export default function Login({ onBackToInfo }: LoginProps) {
             {message}
           </Alert>
         )}
+
+        <Button
+          fullWidth
+          variant="outlined"
+          size="large"
+          onClick={handleGoogleSignIn}
+          disabled={isLoading || isGoogleLoading}
+          sx={{
+            mb: 2,
+            borderColor: "rgba(255,255,255,0.3)",
+            color: "#ffffff",
+            backgroundColor: "rgba(255,255,255,0.05)",
+            "&:hover": {
+              backgroundColor: "rgba(255,255,255,0.1)",
+              borderColor: "rgba(255,255,255,0.5)",
+            },
+            gap: 1.5,
+          }}
+          startIcon={
+            isGoogleLoading ? null : (
+              <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
+                <path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844a4.14 4.14 0 0 1-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615z"/>
+                <path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.184l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z"/>
+                <path fill="#FBBC05" d="M3.964 10.706A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.706V4.962H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.038l3.007-2.332z"/>
+                <path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.962L3.964 7.294C4.672 5.163 6.656 3.58 9 3.58z"/>
+              </svg>
+            )
+          }
+        >
+          {isGoogleLoading ? (
+            <CircularProgress size={22} color="inherit" />
+          ) : (
+            "Continue with Google"
+          )}
+        </Button>
+
+        <Divider sx={{ mb: 2, color: "text.disabled", fontSize: "0.75rem" }}>
+          or
+        </Divider>
 
         <form onSubmit={handleAuth}>
           {!isLogin && (
