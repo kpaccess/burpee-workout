@@ -6,7 +6,8 @@
       "Bash(mkdir -p /Users/krishnapradhan/projects/burpee-workout/.claude/skills/code-review-typescript)",
       "Bash(cp /Users/krishnapradhan/.claude/skills/code-review-typescript/SKILL.md /Users/krishnapradhan/projects/burpee-workout/.claude/skills/code-review-typescript/)",
       "Bash(cp -r /Users/krishnapradhan/.claude/skills/code-review-typescript/evals /Users/krishnapradhan/projects/burpee-workout/.claude/skills/code-review-typescript/)",
-      "Bash(rm -rf /Users/krishnapradhan/.claude/skills/code-review-typescript)"
+      "Bash(rm -rf /Users/krishnapradhan/.claude/skills/code-review-typescript)",
+      "Bash(npx tsc *)"
     ]
   }
 }
