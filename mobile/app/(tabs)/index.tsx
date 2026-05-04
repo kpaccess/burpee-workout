@@ -44,12 +44,6 @@ import * as ImagePicker from "expo-image-picker";
 import * as Haptics from "expo-haptics";
 import * as WebBrowser from "expo-web-browser";
 import * as Google from "expo-auth-session/providers/google";
-import {
-  GoogleSignin,
-  isErrorWithCode,
-  isSuccessResponse,
-  statusCodes,
-} from "@react-native-google-signin/google-signin";
 import { Ionicons } from "@expo/vector-icons";
 import { auth, db } from "../../lib/firebase";
 import { saveUserDataDB } from "../../lib/db";
@@ -65,6 +59,12 @@ import { doc, onSnapshot } from "firebase/firestore";
 import { WorkoutTimer } from "../../components/WorkoutTimer";
 
 WebBrowser.maybeCompleteAuthSession();
+
+type GoogleSignInModule = typeof import("@react-native-google-signin/google-signin");
+
+async function loadNativeGoogleSignIn(): Promise<GoogleSignInModule> {
+  return import("@react-native-google-signin/google-signin");
+}
 
 async function claimPendingSubscription(uid: string, email: string | null) {
   const webUrl = process.env.EXPO_PUBLIC_WEB_URL;
@@ -163,16 +163,6 @@ export default function HomeScreen() {
   const [currentMonth, setCurrentMonth] = useState(() =>
     startOfMonth(new Date()),
   );
-
-  useEffect(() => {
-    if (!isNativeGoogleSignIn) return;
-
-    GoogleSignin.configure({
-      webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
-      iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID,
-      offlineAccess: false,
-    });
-  }, [isNativeGoogleSignIn]);
 
   const completeGoogleFirebaseSignIn = useCallback(async (idToken: string) => {
     const credential = GoogleAuthProvider.credential(idToken);
@@ -314,6 +304,7 @@ export default function HomeScreen() {
   const handleGoogleSignIn = async () => {
     setAuthError("");
     setAuthMessage("");
+    let nativeGoogleModule: GoogleSignInModule | null = null;
 
     if (!isNativeGoogleSignIn && !googleRequest) {
       setAuthError(
@@ -324,7 +315,16 @@ export default function HomeScreen() {
 
     try {
       if (isNativeGoogleSignIn) {
+        nativeGoogleModule = await loadNativeGoogleSignIn();
+        const { GoogleSignin, isSuccessResponse } = nativeGoogleModule;
+
         setIsGoogleAuthenticating(true);
+        GoogleSignin.configure({
+          webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
+          iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID,
+          offlineAccess: false,
+        });
+
         if (Platform.OS === "android") {
           await GoogleSignin.hasPlayServices({
             showPlayServicesUpdateDialog: true,
@@ -357,13 +357,34 @@ export default function HomeScreen() {
       }
     } catch (err: any) {
       setIsGoogleAuthenticating(false);
-      if (isErrorWithCode(err)) {
-        if (err.code === statusCodes.SIGN_IN_CANCELLED) return;
-        if (err.code === statusCodes.IN_PROGRESS) {
+      if (isNativeGoogleSignIn) {
+        const message = err?.message ?? "";
+        if (
+          message.includes("RNGoogleSignin") ||
+          message.includes("native module") ||
+          message.includes("TurboModuleRegistry")
+        ) {
+          setAuthError(
+            "Google sign-in requires the rebuilt iOS/Android app. Rebuild and reopen BurpeePacer instead of Expo Go.",
+          );
+          return;
+        }
+        if (!nativeGoogleModule) {
+          setAuthError(
+            "Google sign-in requires the rebuilt iOS/Android app. Rebuild and reopen BurpeePacer instead of Expo Go.",
+          );
+          return;
+        }
+        const { isErrorWithCode, statusCodes } = nativeGoogleModule;
+        if (isErrorWithCode(err) && err.code === statusCodes.SIGN_IN_CANCELLED) return;
+        if (isErrorWithCode(err) && err.code === statusCodes.IN_PROGRESS) {
           setAuthError("Google sign-in is already in progress.");
           return;
         }
-        if (err.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {
+        if (
+          isErrorWithCode(err) &&
+          err.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE
+        ) {
           setAuthError("Google Play Services is not available or needs an update.");
           return;
         }
