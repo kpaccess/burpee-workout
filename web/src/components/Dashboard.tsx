@@ -765,7 +765,7 @@ export default function Dashboard({
                           variant="outlined"
                         />
                         <Chip
-                          label={`${lvl.sixCounts} 6-counts`}
+                          label={`${lvl.sixCounts} 5-count pushups`}
                           size="small"
                           variant="outlined"
                         />

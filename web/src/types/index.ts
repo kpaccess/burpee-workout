@@ -4,8 +4,8 @@ export interface WorkoutLog {
   levelCompleted?: string;
   /**
    * Workout variant completed that day.
-   * - with_pushups: burpee + pushups
-   * - no_pushups: burpee only
+   * - with_pushups: Navy Seal or 5-count pushup workout
+   * - no_pushups: beginner burpees only
    */
   workoutType?: "with_pushups" | "no_pushups";
   notes?: string;
@@ -58,7 +58,7 @@ export const ADVANCED_LEVELS: LevelDescription[] = [
   {
     id: "1B",
     name: "Level 1B",
-    description: "20 Navy Seals in 20 min, 50 6-counts in 20 min.",
+    description: "20 Navy Seals in 20 min, 50 5-count pushups in 20 min.",
     seals: 20,
     sixCounts: 50,
     timeLimitMintues: 20,
@@ -66,7 +66,7 @@ export const ADVANCED_LEVELS: LevelDescription[] = [
   {
     id: "1C",
     name: "Level 1C",
-    description: "40 Navy Seals in 20 min, 100 6-counts in 20 min.",
+    description: "40 Navy Seals in 20 min, 100 5-count pushups in 20 min.",
     seals: 40,
     sixCounts: 100,
     timeLimitMintues: 20,
@@ -74,7 +74,7 @@ export const ADVANCED_LEVELS: LevelDescription[] = [
   {
     id: "1D",
     name: "Level 1D",
-    description: "60 Navy Seals in 20 min, 150 6-counts in 20 min.",
+    description: "60 Navy Seals in 20 min, 150 5-count pushups in 20 min.",
     seals: 60,
     sixCounts: 150,
     timeLimitMintues: 20,
@@ -82,7 +82,7 @@ export const ADVANCED_LEVELS: LevelDescription[] = [
   {
     id: "2",
     name: "Level 2",
-    description: "80 Navy Seals in 20 min, 200 6-counts in 20 min.",
+    description: "80 Navy Seals in 20 min, 200 5-count pushups in 20 min.",
     seals: 80,
     sixCounts: 200,
     timeLimitMintues: 20,
@@ -90,7 +90,7 @@ export const ADVANCED_LEVELS: LevelDescription[] = [
   {
     id: "3",
     name: "Level 3",
-    description: "100 Navy Seals in 20 min, 250 6-counts in 20 min.",
+    description: "100 Navy Seals in 20 min, 250 5-count pushups in 20 min.",
     seals: 100,
     sixCounts: 250,
     timeLimitMintues: 20,
@@ -98,7 +98,7 @@ export const ADVANCED_LEVELS: LevelDescription[] = [
   {
     id: "4",
     name: "Level 4",
-    description: "120 Navy Seals in 20 min, 275 6-counts in 20 min.",
+    description: "120 Navy Seals in 20 min, 275 5-count pushups in 20 min.",
     seals: 120,
     sixCounts: 275,
     timeLimitMintues: 20,
@@ -106,7 +106,7 @@ export const ADVANCED_LEVELS: LevelDescription[] = [
   {
     id: "grad",
     name: "Graduation",
-    description: "150 Navy Seals in 20 min, 325 6-counts in 20 min.",
+    description: "150 Navy Seals in 20 min, 325 5-count pushups in 20 min.",
     seals: 150,
     sixCounts: 325,
     timeLimitMintues: 20,

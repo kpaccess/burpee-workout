@@ -122,7 +122,7 @@ export default function ProgramScreen() {
           <Text style={styles.programCardDesc}>
             {tier === "beginner"
               ? "Burpees without pushups · 6 levels (B1–B6)"
-              : "Navy Seals + 6-counts · 8 levels (1A–Grad)"}
+              : "Navy Seals + 5-count pushups · 8 levels (1A–Grad)"}
           </Text>
           <TouchableOpacity
             style={styles.switchBtn}
@@ -172,7 +172,7 @@ export default function ProgramScreen() {
           <Text style={styles.otherTrackDesc}>
             {otherTier === "beginner"
               ? "6 levels of burpees without pushups. Great for building a baseline fitness habit."
-              : "8 levels combining Navy Seals (full burpees) and 6-count burpees. Requires Pro subscription."}
+              : "8 levels combining Navy Seals and 5-count pushup burpees. Requires Pro subscription."}
           </Text>
           <TouchableOpacity
             style={[styles.switchBtn, { marginTop: 12, alignSelf: "flex-start" }]}

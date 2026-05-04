@@ -37,7 +37,10 @@
               "scheme": "burpeepacer"
             }
           ],
-          "category": ["BROWSABLE", "DEFAULT"]
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
         }
       ]
     },
@@ -47,6 +50,12 @@
     },
     "plugins": [
       "expo-router",
+      [
+        "@react-native-google-signin/google-signin",
+        {
+          "iosUrlScheme": "com.googleusercontent.apps.551141888003-id9lj9o3sipbacs55rg1elda7931eb93"
+        }
+      ],
       [
         "expo-splash-screen",
         {
@@ -66,7 +75,8 @@
           "photosPermission": "Allow BurpeePacer to access your photos to save your progress.",
           "cameraPermission": "Allow BurpeePacer to access the camera to take progress photos."
         }
-      ]
+      ],
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true,

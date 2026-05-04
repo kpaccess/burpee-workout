@@ -14,7 +14,7 @@ burpee-workout/
 
 ## Features
 
-- **Beginner & Advanced tiers** — beginner sessions count burpees without pushups; advanced unlocks Navy Seals (full range) and 6-Count modes
+- **Beginner & Advanced tiers** — beginner sessions count burpees without pushups; advanced unlocks Navy Seals and 5-count pushup modes
 - **Workout timer** — configurable session length with per-mode goals
 - **Workout log** — tracks daily sessions and milestone check-ins
 - **Pro subscription** — Stripe-powered, managed server-side via webhooks

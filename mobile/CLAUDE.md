@@ -60,7 +60,7 @@ Unlike the web app, the mobile app:
 - Does **not** use a shared `AuthContext` — auth state is managed locally with `onAuthStateChanged` directly in `HomeScreen`
 - Does **not** check Pro/subscription status — no `useSubscription` hook, no `ProGate`, no Stripe integration
 - Has a **copy** of the timer logic in `lib/workoutTimer.ts` rather than importing from `../shared/`
-- `WorkoutLog.workoutType` is typed as `"N" | "C"` (vs web's `"with_pushups" | "no_pushups"`)
+- `WorkoutLog.workoutType` is typed as `"with_pushups" | "no_pushups"`; advanced `N`/`C` logs are both pushup workouts, while no-pushup logs are beginner only.
 
 ### Shared Data Model
 

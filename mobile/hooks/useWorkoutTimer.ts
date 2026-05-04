@@ -12,7 +12,7 @@ export type TimerPhase = "idle" | "prepare" | "workout" | "done";
 
 interface UseWorkoutTimerOptions {
   config: WorkoutTimerConfig;
-  onFinish?: () => void;
+  onFinish?: (repsCompleted: number, mode: WorkoutMode) => void;
   onRepBoundary?: (rep: number, mode: WorkoutMode) => void;
   onPrepareTick?: () => void;
   onGo?: () => void;
@@ -166,7 +166,8 @@ export function useWorkoutTimer({
         if (clampedNextValue === 0) {
           setIsActive(false);
           setPhase("done");
-          onFinishRef.current?.();
+          const finalRep = intervalSeconds > 0 ? activeMode.goal : 0;
+          onFinishRef.current?.(finalRep, activeMode.mode);
         }
 
         return clampedNextValue;

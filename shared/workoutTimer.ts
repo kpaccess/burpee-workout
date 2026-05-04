@@ -62,9 +62,9 @@ export function buildWorkoutTimerConfig({
       },
       {
         mode: "C",
-        label: "6-Counts",
+        label: "5-Count Pushups",
         shortLabel: "C",
-        description: "Strict 6-count burpees",
+        description: "Strict 5-count pushup burpees",
         goal: sixCountsGoal,
       },
     ],

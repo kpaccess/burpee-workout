@@ -44,7 +44,7 @@ User data lives in a single Firestore doc (`users/{userId}`). `useUserData` (`sr
 
 Imported via `experimental.externalDir: true` in `next.config.ts`.
 
-- `shared/workoutTimer.ts` — `buildWorkoutTimerConfig()` builds tier-specific workout configs (modes, goals). Beginner: single (C) mode counting burpees. Advanced: two modes (N = Navy Seals, C = 6-counts) with separate goals.
+- `shared/workoutTimer.ts` — `buildWorkoutTimerConfig()` builds tier-specific workout configs (modes, goals). Beginner: single (C) mode counting burpees without pushups. Advanced: two modes (N = Navy Seals, C = 5-count pushups) with separate goals.
 - `shared/useWorkoutTimer.ts` — React hook wrapping the timer state machine.
 
 ### Subscription & Access Control

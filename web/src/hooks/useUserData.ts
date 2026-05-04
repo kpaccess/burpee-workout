@@ -5,6 +5,7 @@ import { getUserData, saveUserDataDB } from "../lib/db";
 import { toDateKey } from "../lib/date";
 
 type PersistedWorkoutLog = WorkoutLog & {
+  // Advanced N/C workouts include pushups; no_pushups is reserved for beginner C logs.
   workoutType?: "with_pushups" | "no_pushups";
 };
 
@@ -100,9 +101,9 @@ export function useUserData() {
         : `${userData.currentLevelId || ""}${typeSuffix}`
       : null;
     const workoutType =
-      effectiveType === "N"
+      effectiveType === "N" || (!isBeginnerTrack && effectiveType === "C")
         ? "with_pushups"
-        : effectiveType === "C"
+        : isBeginnerTrack && effectiveType === "C"
           ? "no_pushups"
           : undefined;
 

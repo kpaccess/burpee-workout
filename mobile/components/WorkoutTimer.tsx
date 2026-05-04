@@ -12,6 +12,7 @@ import { useAudioPlayer } from "expo-audio";
 import {
   buildWorkoutTimerConfig,
   formatWorkoutTimerTime,
+  WorkoutMode,
 } from "../lib/workoutTimer";
 import { useWorkoutTimer } from "../hooks/useWorkoutTimer";
 import { WorkoutTier } from "../types";
@@ -19,7 +20,7 @@ import { WorkoutTier } from "../types";
 interface WorkoutTimerProps {
   tier?: WorkoutTier;
   initialMinutes?: number;
-  onFinish?: () => void;
+  onFinish?: (repsCompleted: number, mode: WorkoutMode) => void;
   sealsGoal?: number;
   sixCountsGoal?: number;
 }
@@ -77,11 +78,11 @@ export const WorkoutTimer: React.FC<WorkoutTimerProps> = ({
       setTimeout(() => playBeep(1.0), 150);
       setTimeout(() => playBeep(1.0), 300); // Triple burst for whistle
     },
-    onFinish: () => {
+    onFinish: (repsCompleted, mode) => {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       playBeep(1.0);
       setTimeout(() => playBeep(1.0), 400);
-      onFinish?.();
+      onFinish?.(repsCompleted, mode);
     },
     onRepBoundary: () => {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);

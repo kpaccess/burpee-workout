@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   Modal,
   Linking,
+  Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
@@ -34,13 +35,24 @@ import {
   updateProfile,
   signOut,
   User,
+  GoogleAuthProvider,
+  signInWithCredential,
+  getAdditionalUserInfo,
 } from "firebase/auth";
 import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
 import * as Haptics from "expo-haptics";
+import * as WebBrowser from "expo-web-browser";
+import * as Google from "expo-auth-session/providers/google";
+import {
+  GoogleSignin,
+  isErrorWithCode,
+  isSuccessResponse,
+  statusCodes,
+} from "@react-native-google-signin/google-signin";
 import { Ionicons } from "@expo/vector-icons";
 import { auth, db } from "../../lib/firebase";
-import { getUserData, saveUserDataDB } from "../../lib/db";
+import { saveUserDataDB } from "../../lib/db";
 import {
   ADVANCED_LEVELS,
   BEGINNER_LEVELS,
@@ -52,8 +64,62 @@ import {
 import { doc, onSnapshot } from "firebase/firestore";
 import { WorkoutTimer } from "../../components/WorkoutTimer";
 
+WebBrowser.maybeCompleteAuthSession();
+
+async function claimPendingSubscription(uid: string, email: string | null) {
+  const webUrl = process.env.EXPO_PUBLIC_WEB_URL;
+  if (!webUrl || !email) return;
+
+  try {
+    const res = await fetch(`${webUrl}/api/claim-subscription`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ uid, email }),
+    });
+    if (!res.ok) {
+      console.warn(`Failed to claim subscription: ${res.status} ${res.statusText}`);
+    }
+  } catch (err) {
+    console.error("Failed to claim pending subscription:", err);
+  }
+}
+
+async function sendWelcomeEmail(uid: string, email: string | null) {
+  const webUrl = process.env.EXPO_PUBLIC_WEB_URL;
+  if (!webUrl || !email) return false;
+
+  try {
+    const res = await fetch(`${webUrl}/api/send-welcome-email`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ uid, email }),
+    });
+    if (!res.ok) {
+      console.warn(`Failed to send welcome email: ${res.status} ${res.statusText}`);
+      return false;
+    }
+    const data = await res.json();
+    return Boolean(data.sent);
+  } catch (err) {
+    console.error("Error sending welcome email:", err);
+    return false;
+  }
+}
+
 export default function HomeScreen() {
   const router = useRouter();
+  const isNativeGoogleSignIn =
+    Platform.OS === "ios" || Platform.OS === "android";
+  const [googleRequest, googleResponse, promptGoogleSignIn] =
+    Google.useIdTokenAuthRequest(
+      {
+        webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
+        iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID,
+        androidClientId: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID,
+        selectAccount: true,
+      },
+      { scheme: "burpeepacer" },
+    );
   const [user, setUser] = useState<User | null>(null);
   const [userData, setUserData] = useState<UserData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -69,6 +135,7 @@ export default function HomeScreen() {
   const [authError, setAuthError] = useState("");
   const [authMessage, setAuthMessage] = useState("");
   const [isAuthenticating, setIsAuthenticating] = useState(false);
+  const [isGoogleAuthenticating, setIsGoogleAuthenticating] = useState(false);
 
   // Onboarding Forms
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
@@ -83,6 +150,8 @@ export default function HomeScreen() {
   // Dashboard Modals
   const [showSwitchProgramModal, setShowSwitchProgramModal] = useState(false);
   const [showCheckinModal, setShowCheckinModal] = useState(false);
+  const [dismissedAdvancedSuggestion, setDismissedAdvancedSuggestion] =
+    useState(false);
   const [checkinWeight, setCheckinWeight] = useState("");
   const [checkinPicture, setCheckinPicture] = useState<string | null>(null);
 
@@ -94,6 +163,35 @@ export default function HomeScreen() {
   const [currentMonth, setCurrentMonth] = useState(() =>
     startOfMonth(new Date()),
   );
+
+  useEffect(() => {
+    if (!isNativeGoogleSignIn) return;
+
+    GoogleSignin.configure({
+      webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
+      iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID,
+      offlineAccess: false,
+    });
+  }, [isNativeGoogleSignIn]);
+
+  const completeGoogleFirebaseSignIn = useCallback(async (idToken: string) => {
+    const credential = GoogleAuthProvider.credential(idToken);
+    const userCredential = await signInWithCredential(auth, credential);
+    const isNewUser =
+      getAdditionalUserInfo(userCredential)?.isNewUser ?? false;
+
+    if (isNewUser) {
+      await sendWelcomeEmail(
+        userCredential.user.uid,
+        userCredential.user.email,
+      );
+    }
+    await claimPendingSubscription(
+      userCredential.user.uid,
+      userCredential.user.email,
+    );
+    setAuthError("");
+  }, []);
 
   useEffect(() => {
     let unsubSnapshot: (() => void) | null = null;
@@ -134,6 +232,46 @@ export default function HomeScreen() {
     };
   }, []);
 
+  useEffect(() => {
+    const completeGoogleSignIn = async () => {
+      if (!googleResponse) return;
+
+      if (googleResponse.type !== "success") {
+        setIsGoogleAuthenticating(false);
+        if (googleResponse.type === "error") {
+          setAuthError(
+            googleResponse.error?.message ?? "Google sign-in failed.",
+          );
+        }
+        return;
+      }
+
+      const idToken = googleResponse.params.id_token;
+      if (!idToken) {
+        setAuthError("Google sign-in did not return an ID token.");
+        setIsGoogleAuthenticating(false);
+        return;
+      }
+
+      try {
+        await completeGoogleFirebaseSignIn(idToken);
+      } catch (err: any) {
+        const code = err?.code ?? "";
+        if (code === "auth/account-exists-with-different-credential") {
+          setAuthError(
+            "An account already exists with this email using a different sign-in method. Try signing in with email and password instead.",
+          );
+        } else {
+          setAuthError(err?.message ?? "Google sign-in failed.");
+        }
+      } finally {
+        setIsGoogleAuthenticating(false);
+      }
+    };
+
+    completeGoogleSignIn();
+  }, [completeGoogleFirebaseSignIn, googleResponse]);
+
   const handleAuth = async () => {
     setAuthError("");
     setAuthMessage("");
@@ -170,6 +308,71 @@ export default function HomeScreen() {
       );
     } catch (err: any) {
       setAuthError(err.message);
+    }
+  };
+
+  const handleGoogleSignIn = async () => {
+    setAuthError("");
+    setAuthMessage("");
+
+    if (!isNativeGoogleSignIn && !googleRequest) {
+      setAuthError(
+        "Google sign-in is not configured for mobile. Add EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID, and native client IDs for production builds.",
+      );
+      return;
+    }
+
+    try {
+      if (isNativeGoogleSignIn) {
+        setIsGoogleAuthenticating(true);
+        if (Platform.OS === "android") {
+          await GoogleSignin.hasPlayServices({
+            showPlayServicesUpdateDialog: true,
+          });
+        }
+
+        const nativeResult = await GoogleSignin.signIn();
+        if (!isSuccessResponse(nativeResult)) {
+          setIsGoogleAuthenticating(false);
+          return;
+        }
+
+        const idToken = nativeResult.data.idToken;
+        if (!idToken) {
+          setAuthError("Google sign-in did not return an ID token.");
+          setIsGoogleAuthenticating(false);
+          return;
+        }
+
+        await completeGoogleFirebaseSignIn(idToken);
+        setIsGoogleAuthenticating(false);
+        return;
+      }
+
+      const signInResult = promptGoogleSignIn();
+      setIsGoogleAuthenticating(true);
+      const result = await signInResult;
+      if (result.type !== "success") {
+        setIsGoogleAuthenticating(false);
+      }
+    } catch (err: any) {
+      setIsGoogleAuthenticating(false);
+      if (isErrorWithCode(err)) {
+        if (err.code === statusCodes.SIGN_IN_CANCELLED) return;
+        if (err.code === statusCodes.IN_PROGRESS) {
+          setAuthError("Google sign-in is already in progress.");
+          return;
+        }
+        if (err.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {
+          setAuthError("Google Play Services is not available or needs an update.");
+          return;
+        }
+      }
+      setAuthError(
+        err?.message?.includes("Popup window was blocked")
+          ? "Google sign-in popup was blocked. Allow popups for localhost, or try sign-in from Expo Go on your phone."
+          : err?.message ?? "Google sign-in failed.",
+      );
     }
   };
 
@@ -373,6 +576,7 @@ export default function HomeScreen() {
     dateStr: string,
     completed: boolean,
     type?: "N" | "C",
+    repsCompleted?: number,
   ) => {
     if (!user || !userData) return;
 
@@ -395,9 +599,9 @@ export default function HomeScreen() {
         : `${userData.currentLevelId || ""}${typeSuffix}`
       : undefined;
     const workoutType =
-      effectiveType === "N"
+      effectiveType === "N" || (!isBeginnerTrack && effectiveType === "C")
         ? "with_pushups"
-        : effectiveType === "C"
+        : isBeginnerTrack && effectiveType === "C"
           ? "no_pushups"
           : undefined;
 
@@ -409,6 +613,7 @@ export default function HomeScreen() {
           completed: false,
           levelCompleted: undefined,
           workoutType: undefined,
+          repsCompleted: undefined,
         };
       } else {
         logs[idx] = {
@@ -416,6 +621,7 @@ export default function HomeScreen() {
           completed: true,
           levelCompleted,
           workoutType,
+          repsCompleted,
         };
       }
     } else if (completed) {
@@ -424,6 +630,7 @@ export default function HomeScreen() {
         completed: true,
         levelCompleted,
         workoutType,
+        repsCompleted,
       });
     }
 
@@ -432,6 +639,9 @@ export default function HomeScreen() {
       if (log.levelCompleted) safeLog.levelCompleted = log.levelCompleted;
       if (log.workoutType) safeLog.workoutType = log.workoutType;
       if (log.notes) safeLog.notes = log.notes;
+      if (log.repsCompleted !== undefined) {
+        safeLog.repsCompleted = log.repsCompleted;
+      }
       return safeLog as WorkoutLog;
     });
 
@@ -608,6 +818,33 @@ export default function HomeScreen() {
             {authMessage ? (
               <Text style={styles.authMessageText}>{authMessage}</Text>
             ) : null}
+            <TouchableOpacity
+              style={[
+                styles.googleSignInBtn,
+                (isAuthenticating || isGoogleAuthenticating) &&
+                  styles.disabledBtn,
+              ]}
+              onPress={handleGoogleSignIn}
+              disabled={isAuthenticating || isGoogleAuthenticating}
+            >
+              {isGoogleAuthenticating ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <>
+                  <View style={styles.googleIconCircle}>
+                    <Text style={styles.googleIconText}>G</Text>
+                  </View>
+                  <Text style={styles.googleSignInText}>
+                    Continue with Google
+                  </Text>
+                </>
+              )}
+            </TouchableOpacity>
+            <View style={styles.authDividerRow}>
+              <View style={styles.authDividerLine} />
+              <Text style={styles.authDividerText}>or</Text>
+              <View style={styles.authDividerLine} />
+            </View>
             {!isLoginFlow && (
               <View style={{ flexDirection: "row", gap: 10 }}>
                 <TextInput
@@ -656,7 +893,7 @@ export default function HomeScreen() {
             <TouchableOpacity
               style={styles.primaryActionBtn}
               onPress={handleAuth}
-              disabled={isAuthenticating}
+              disabled={isAuthenticating || isGoogleAuthenticating}
             >
               {isAuthenticating ? (
                 <ActivityIndicator color="#fff" />
@@ -946,6 +1183,11 @@ export default function HomeScreen() {
   const currentLevelObj = userData.currentLevelId
     ? levelsForTrack.find((l) => l.id === userData.currentLevelId)
     : null;
+  const hasCompletedB6 = (userData.workoutLogs ?? []).some(
+    (log) => log.completed && (log.levelCompleted ?? "").startsWith("B6"),
+  );
+  const shouldShowAdvancedSuggestion =
+    isBeginnerTrack && hasCompletedB6 && !dismissedAdvancedSuggestion;
 
   // Generate Calendar Data
   const monthStart = startOfMonth(currentMonth);
@@ -963,22 +1205,30 @@ export default function HomeScreen() {
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={{ padding: 20 }}>
         <View style={styles.headerRow}>
-          <View>
-            <Text style={styles.header}>My Burpee Journey</Text>
+          <View style={styles.headerTextBlock}>
+            <Text style={styles.header} numberOfLines={2}>
+              My Burpee Journey
+            </Text>
             <Text style={styles.desc}>
               Day {daysPassed} • The Busy Dad Program
             </Text>
           </View>
-          <View style={{ gap: 8 }}>
-            <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
+          <View style={styles.headerActions}>
+            <TouchableOpacity
+              style={styles.headerActionBtn}
+              onPress={handleLogout}
+            >
               <Text style={styles.logoutText}>Log Out</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.logoutBtn, { borderColor: "#00E5FF" }]}
+              style={[styles.headerActionBtn, styles.switchProgramBtn]}
               onPress={() => setShowSwitchProgramModal(true)}
             >
-              <Text style={[styles.logoutText, { color: "#00E5FF" }]}>
-                Switch Program
+              <Text
+                style={[styles.logoutText, styles.switchProgramText]}
+                numberOfLines={1}
+              >
+                Switch
               </Text>
             </TouchableOpacity>
           </View>
@@ -1014,6 +1264,39 @@ export default function HomeScreen() {
             </View>
             <Text style={styles.upgradePromoArrow}>→</Text>
           </TouchableOpacity>
+        ) : null}
+
+        {shouldShowAdvancedSuggestion ? (
+          <View style={styles.advancedSuggestionCard}>
+            <Text style={styles.advancedSuggestionTitle}>
+              Nice work - you completed Beginner B6
+            </Text>
+            <Text style={styles.advancedSuggestionText}>
+              You are ready for the Advanced track. Want to move to Level 1B and
+              keep progressing?
+            </Text>
+            <View style={styles.advancedSuggestionActions}>
+              <TouchableOpacity
+                style={styles.advancedSuggestionPrimary}
+                onPress={async () => {
+                  await handleSwitchProgram("advanced");
+                  setDismissedAdvancedSuggestion(true);
+                }}
+              >
+                <Text style={styles.advancedSuggestionPrimaryText}>
+                  Switch to Advanced
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.advancedSuggestionSecondary}
+                onPress={() => setDismissedAdvancedSuggestion(true)}
+              >
+                <Text style={styles.advancedSuggestionSecondaryText}>
+                  Maybe later
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
         ) : null}
 
         {/* Stats Grid */}
@@ -1114,10 +1397,12 @@ export default function HomeScreen() {
             tier={workoutTier}
             sealsGoal={currentLevelObj?.seals}
             sixCountsGoal={currentLevelObj?.sixCounts}
-            onFinish={() => {
+            onFinish={(repsCompleted, mode) => {
               const todayKey = toDateKey(new Date());
               if (isBeginnerTrack) {
-                handleToggleWorkout(todayKey, true, "C");
+                handleToggleWorkout(todayKey, true, "C", repsCompleted);
+              } else if (!isPro) {
+                handleToggleWorkout(todayKey, true, undefined, repsCompleted);
               } else {
                 setSelectedDateForWorkout(todayKey);
                 setWorkoutModalVisible(true);
@@ -1169,6 +1454,8 @@ export default function HomeScreen() {
                 );
                 const dayLog = getWorkoutLogForDate(dateStr);
                 const isDone = !!dayLog?.completed;
+                const todayKey = toDateKey(new Date());
+                const isPast = dateStr < todayKey;
 
                 return (
                   <TouchableOpacity
@@ -1185,10 +1472,15 @@ export default function HomeScreen() {
                     ]}
                     onPress={() => {
                       if (!isWorkoutDay) return;
+                      if (isPast && !isDone) return;
                       if (isDone) {
                         handleToggleWorkout(dateStr, false);
-                      } else if (isBeginnerTrack) {
-                        handleToggleWorkout(dateStr, true, "C");
+                      } else if (isBeginnerTrack || !isPro) {
+                        handleToggleWorkout(
+                          dateStr,
+                          true,
+                          isBeginnerTrack ? "C" : undefined,
+                        );
                       } else {
                         setSelectedDateForWorkout(dateStr);
                         setWorkoutModalVisible(true);
@@ -1211,6 +1503,9 @@ export default function HomeScreen() {
                         </Text>
                       </View>
                     )}
+                    {isPast && !isDone && isWorkoutDay && isCurrentMonth && (
+                      <Text style={styles.calendarMissedText}>Missed</Text>
+                    )}
                     {!isDone && isWorkoutDay && isCurrentMonth && (
                       <View style={styles.calendarRestMarker} />
                     )}
@@ -1227,30 +1522,57 @@ export default function HomeScreen() {
         {/* Video Tutorials */}
         <View style={{ marginTop: 30 }}>
           <Text style={styles.sectionTitle}>Tutorials & Intro</Text>
-          <View style={styles.videoRow}>
+          {isBeginnerTrack ? (
             <TouchableOpacity
               style={styles.videoCard}
               onPress={() =>
-                Linking.openURL(
-                  "https://www.youtube.com/watch?v=3Yooen5zgCg&list=PLhE7BYqSXmSEuE2qoJE9w3rLEzuenuoLq&index=1",
-                )
+                Linking.openURL("https://www.youtube.com/shorts/O9E5BSf2l1Q")
               }
             >
               <Ionicons name="play-circle" size={32} color="#FF3366" />
-              <Text style={styles.videoCardText}>Program Intro</Text>
+              <Text style={styles.videoCardText}>Beginner Burpee Demo</Text>
             </TouchableOpacity>
+          ) : isPro ? (
+            <View style={styles.videoRow}>
+              <TouchableOpacity
+                style={styles.videoCard}
+                onPress={() =>
+                  Linking.openURL(
+                    "https://www.youtube.com/watch?v=3Yooen5zgCg&list=PLhE7BYqSXmSEuE2qoJE9w3rLEzuenuoLq&index=1",
+                  )
+                }
+              >
+                <Ionicons name="play-circle" size={32} color="#FF3366" />
+                <Text style={styles.videoCardText}>Program Intro</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.videoCard}
+                onPress={() =>
+                  Linking.openURL(
+                    "https://www.youtube.com/playlist?list=PLhE7BYqSXmSEJFzla9_j34HEmLdEsOrvF",
+                  )
+                }
+              >
+                <Ionicons name="videocam" size={32} color="#00E5FF" />
+                <Text style={styles.videoCardText}>Forms & Levels</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
             <TouchableOpacity
-              style={styles.videoCard}
-              onPress={() =>
-                Linking.openURL(
-                  "https://www.youtube.com/playlist?list=PLhE7BYqSXmSEJFzla9_j34HEmLdEsOrvF",
-                )
-              }
+              style={styles.upgradePromoBanner}
+              onPress={() => router.push("/pricing")}
             >
-              <Ionicons name="videocam" size={32} color="#00E5FF" />
-              <Text style={styles.videoCardText}>Forms & Levels</Text>
+              <View>
+                <Text style={styles.upgradePromoTitle}>
+                  Advanced videos are paid
+                </Text>
+                <Text style={styles.upgradePromoText}>
+                  Subscribe to keep advanced tutorial access.
+                </Text>
+              </View>
+              <Text style={styles.upgradePromoArrow}>→</Text>
             </TouchableOpacity>
-          </View>
+          )}
         </View>
 
         {/* Progress Photos */}
@@ -1446,8 +1768,8 @@ export default function HomeScreen() {
                   </Text>
                 </View>
                 <View>
-                  <Text style={styles.optionTitle}>6-Counts</Text>
-                  <Text style={styles.optionDesc}>Strict 6-count burpees</Text>
+                  <Text style={styles.optionTitle}>5-Count Pushups</Text>
+                  <Text style={styles.optionDesc}>Strict 5-count pushup burpees</Text>
                 </View>
               </TouchableOpacity>
 
@@ -1587,28 +1909,17 @@ export default function HomeScreen() {
               style={[
                 styles.workoutOptionBtn,
                 workoutTier === "advanced" && { borderColor: "#00E5FF", backgroundColor: "rgba(0,229,255,0.08)" },
-                !isPro && { opacity: 0.5 },
               ]}
-              onPress={() => {
-                if (!isPro) {
-                  setShowSwitchProgramModal(false);
-                  router.push("/pricing");
-                  return;
-                }
-                handleSwitchProgram("advanced");
-              }}
+              onPress={() => handleSwitchProgram("advanced")}
             >
               <View style={[styles.optionIconBox, { backgroundColor: "rgba(0, 229, 255, 0.1)" }]}>
                 <Ionicons name="flash-outline" size={24} color="#00E5FF" />
               </View>
               <View>
                 <Text style={styles.optionTitle}>Advanced</Text>
-                <Text style={styles.optionDesc}>Navy Seals + 6-counts · 1A–Grad</Text>
+                <Text style={styles.optionDesc}>Navy Seals + 5-count pushups · 1A–Grad</Text>
               </View>
               <View style={{ marginLeft: "auto", flexDirection: "row", alignItems: "center", gap: 8 }}>
-                {!isPro && (
-                  <Text style={{ color: "#f59e0b", fontSize: 11, fontWeight: "600" }}>PRO</Text>
-                )}
                 {workoutTier === "advanced" && (
                   <Ionicons name="checkmark-circle" size={20} color="#00E5FF" />
                 )}
@@ -1786,6 +2097,56 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     textAlign: "center",
   },
+  googleSignInBtn: {
+    height: 52,
+    borderRadius: 16,
+    borderColor: "rgba(255,255,255,0.22)",
+    borderWidth: 1,
+    backgroundColor: "rgba(255,255,255,0.06)",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 12,
+    marginBottom: 16,
+  },
+  googleIconCircle: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: "#fff",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  googleIconText: {
+    color: "#4285F4",
+    fontSize: 16,
+    fontWeight: "900",
+  },
+  googleSignInText: {
+    color: "#fff",
+    fontSize: 15,
+    fontWeight: "800",
+  },
+  authDividerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginBottom: 16,
+  },
+  authDividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: "#222",
+  },
+  authDividerText: {
+    color: "#666",
+    fontSize: 12,
+    fontWeight: "700",
+    textTransform: "uppercase",
+  },
+  disabledBtn: {
+    opacity: 0.65,
+  },
   forgotPasswordBtn: {
     alignSelf: "center",
     marginTop: 14,
@@ -1812,22 +2173,37 @@ const styles = StyleSheet.create({
   infoBannerText: { color: "#fff", fontWeight: "600" },
   infoBannerTextMuted: { color: "#666", marginTop: 4, fontSize: 12 },
   errorText: { color: "#ff6b6b", marginBottom: 10, textAlign: "center" },
-  header: { fontSize: 32, fontWeight: "900", color: "#fff", letterSpacing: -1 },
+  header: { fontSize: 30, fontWeight: "900", color: "#fff" },
   desc: { fontSize: 16, color: "#666", marginBottom: 10 },
   headerRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-start",
+    gap: 12,
     marginBottom: 20,
   },
-  logoutBtn: {
+  headerTextBlock: {
+    flex: 1,
+    minWidth: 0,
+  },
+  headerActions: {
+    gap: 8,
+    alignItems: "flex-end",
+    flexShrink: 0,
+  },
+  headerActionBtn: {
     borderColor: "#222",
     borderWidth: 1,
     borderRadius: 12,
-    paddingHorizontal: 16,
+    minWidth: 84,
+    maxWidth: 104,
+    paddingHorizontal: 12,
     paddingVertical: 10,
     backgroundColor: "#111",
+    alignItems: "center",
   },
+  switchProgramBtn: { borderColor: "#00E5FF" },
+  switchProgramText: { color: "#00E5FF" },
   logoutText: { color: "#888", fontWeight: "700", fontSize: 13 },
   milestoneCard: {
     backgroundColor: "rgba(255, 51, 102, 0.1)",
@@ -1871,6 +2247,51 @@ const styles = StyleSheet.create({
     color: "#f59e0b",
     fontSize: 20,
     fontWeight: "700",
+  },
+  advancedSuggestionCard: {
+    backgroundColor: "rgba(245,158,11,0.1)",
+    borderColor: "rgba(245,158,11,0.45)",
+    borderWidth: 1,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 24,
+  },
+  advancedSuggestionTitle: {
+    color: "#f59e0b",
+    fontWeight: "900",
+    fontSize: 16,
+    marginBottom: 6,
+  },
+  advancedSuggestionText: {
+    color: "#ccc",
+    fontSize: 13,
+    lineHeight: 19,
+  },
+  advancedSuggestionActions: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 14,
+  },
+  advancedSuggestionPrimary: {
+    backgroundColor: "#f59e0b",
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  advancedSuggestionPrimaryText: {
+    color: "#000",
+    fontWeight: "900",
+    fontSize: 13,
+  },
+  advancedSuggestionSecondary: {
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  advancedSuggestionSecondaryText: {
+    color: "#f59e0b",
+    fontWeight: "800",
+    fontSize: 13,
   },
   statsCard: {
     backgroundColor: "#111",
@@ -2009,6 +2430,12 @@ const styles = StyleSheet.create({
     color: "#000",
     fontSize: 8,
     fontWeight: "900",
+  },
+  calendarMissedText: {
+    color: "#555",
+    fontSize: 8,
+    fontWeight: "700",
+    marginTop: 2,
   },
   calendarRestMarker: {
     width: 4,

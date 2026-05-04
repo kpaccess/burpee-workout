@@ -1,7 +1,6 @@
-import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getAuth, initializeAuth, getReactNativePersistence } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { initializeApp, getApps, getApp } from "firebase/app";
+import { getAuth, initializeAuth, type Auth } from "firebase/auth";
+import { getFirestore } from "firebase/firestore";
 
 const firebaseConfig = {
   apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
@@ -12,16 +11,17 @@ const firebaseConfig = {
   appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID,
 };
 
-const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
-
-// Initialize Firebase Auth with AsyncStorage for persistence
-const auth = getAuth(app);
-if (!auth) {
-  // If not already initialized above 
-  initializeAuth(app, {
-    persistence: getReactNativePersistence(AsyncStorage)
-  });
+// Initialize app + auth once. On subsequent hot-reloads the app is already
+// registered, so we grab the existing instance and its auth object.
+let auth: Auth;
+if (getApps().length === 0) {
+  const app = initializeApp(firebaseConfig);
+  auth = initializeAuth(app);
+} else {
+  auth = getAuth(getApp());
 }
 
 export { auth };
-export const db = getFirestore(app);
+export const db = getFirestore(
+  getApps().length > 0 ? getApp() : initializeApp(firebaseConfig),
+);
