@@ -1,31 +1,51 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAdminDb } from "@/lib/firebase-admin";
+import { getAdminDb, getAdminApp } from "@/lib/firebase-admin";
+import { getAuth } from "firebase-admin/auth";
 
 /**
  * POST /api/claim-subscription
  * Called client-side after login/signup to claim a pending subscription
  * that was created during guest Stripe checkout.
  *
- * Body: { uid: string, email: string }
+ * Body: { uid: string }
  *
  * This runs server-side with Admin SDK so the client never needs to
  * write subscription fields directly to the users collection.
  */
 export async function POST(req: NextRequest) {
   try {
-    const { uid, email } = await req.json();
+    const authHeader = req.headers.get("authorization") ?? "";
+    const idToken = authHeader.replace("Bearer ", "").trim();
 
-    if (!uid || !email) {
+    if (!idToken) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    let decoded;
+    try {
+      decoded = await getAuth(getAdminApp()).verifyIdToken(idToken);
+    } catch {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    const { uid } = await req.json();
+
+    if (!uid) {
       return NextResponse.json(
-        { error: "Missing uid or email" },
+        { error: "Missing uid" },
         { status: 400 },
       );
+    }
+
+    const email = decoded.email?.trim().toLowerCase();
+    if (decoded.uid !== uid || !email) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     const db = getAdminDb();
     const pendingRef = db
       .collection("pending_subscriptions")
-      .doc(email.toLowerCase());
+      .doc(email);
     const pendingSnap = await pendingRef.get();
 
     if (!pendingSnap.exists) {

@@ -44,6 +44,8 @@ import * as ImagePicker from "expo-image-picker";
 import * as Haptics from "expo-haptics";
 import * as WebBrowser from "expo-web-browser";
 import * as Google from "expo-auth-session/providers/google";
+import * as AuthSession from "expo-auth-session";
+import Constants from "expo-constants";
 import { Ionicons } from "@expo/vector-icons";
 import { auth, db } from "../../lib/firebase";
 import { saveUserDataDB } from "../../lib/db";
@@ -60,21 +62,46 @@ import { WorkoutTimer } from "../../components/WorkoutTimer";
 
 WebBrowser.maybeCompleteAuthSession();
 
+// Detect Expo Go at module level (stable across renders)
+const IS_EXPO_GO = Constants.appOwnership === "expo";
+
+// In Expo Go, Google OAuth requires the Expo Auth proxy (HTTPS redirect URL).
+// In production/dev builds, use the app's custom scheme.
+const EXPO_PROXY_REDIRECT_URI = "https://auth.expo.io/@kpaccess/burpee-pacer";
+
+function getGoogleRedirectUri(): string | undefined {
+  if (!IS_EXPO_GO) return undefined; // let expo-auth-session use the default
+  try {
+    // Returns https://auth.expo.io/@owner/slug — accepted by Google OAuth
+    return AuthSession.getRedirectUrl() || EXPO_PROXY_REDIRECT_URI;
+  } catch {
+    // Falls back to the known proxy URL (already added to Google Cloud Console)
+    return EXPO_PROXY_REDIRECT_URI;
+  }
+}
+
 type GoogleSignInModule = typeof import("@react-native-google-signin/google-signin");
 
 async function loadNativeGoogleSignIn(): Promise<GoogleSignInModule> {
   return import("@react-native-google-signin/google-signin");
 }
 
-async function claimPendingSubscription(uid: string, email: string | null) {
+async function claimPendingSubscription(
+  uid: string,
+  email: string | null,
+  firebaseIdToken: string,
+) {
   const webUrl = process.env.EXPO_PUBLIC_WEB_URL;
   if (!webUrl || !email) return;
 
   try {
     const res = await fetch(`${webUrl}/api/claim-subscription`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ uid, email }),
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${firebaseIdToken}`,
+      },
+      body: JSON.stringify({ uid }),
     });
     if (!res.ok) {
       console.warn(`Failed to claim subscription: ${res.status} ${res.statusText}`);
@@ -84,15 +111,22 @@ async function claimPendingSubscription(uid: string, email: string | null) {
   }
 }
 
-async function sendWelcomeEmail(uid: string, email: string | null) {
+async function sendWelcomeEmail(
+  uid: string,
+  email: string | null,
+  firebaseIdToken: string,
+) {
   const webUrl = process.env.EXPO_PUBLIC_WEB_URL;
   if (!webUrl || !email) return false;
 
   try {
     const res = await fetch(`${webUrl}/api/send-welcome-email`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ uid, email }),
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${firebaseIdToken}`,
+      },
+      body: JSON.stringify({ uid }),
     });
     if (!res.ok) {
       console.warn(`Failed to send welcome email: ${res.status} ${res.statusText}`);
@@ -108,15 +142,36 @@ async function sendWelcomeEmail(uid: string, email: string | null) {
 
 export default function HomeScreen() {
   const router = useRouter();
+  // Use native Google Sign-In only in custom builds (not Expo Go).
+  // In Expo Go, RNGoogleSignin is not in the native binary and calling
+  // TurboModuleRegistry.getEnforcing() causes a fatal crash before any
+  // try/catch can run. Fall back to expo-auth-session in Expo Go.
   const isNativeGoogleSignIn =
-    Platform.OS === "ios" || Platform.OS === "android";
+    !IS_EXPO_GO && (Platform.OS === "ios" || Platform.OS === "android");
+
+  // In Expo Go: use the Expo Auth proxy redirect URI (HTTPS — accepted by Google).
+  // iOS/Android native client IDs expect a custom scheme redirect that Expo Go
+  // cannot provide, so we use only the web client ID in Expo Go.
+  const expoGoRedirectUri = IS_EXPO_GO ? getGoogleRedirectUri() : undefined;
+
   const [googleRequest, googleResponse, promptGoogleSignIn] =
     Google.useIdTokenAuthRequest(
       {
         webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
-        iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID,
-        androidClientId: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID,
+        // In Expo Go, the hook always picks iosClientId as the OAuth client on
+        // iOS. But the proxy redirect URI is only authorized on the web client.
+        // Setting iosClientId = webClientId in Expo Go makes the request use
+        // the web client, so its authorized redirect URI (the proxy) matches.
+        iosClientId: IS_EXPO_GO
+          ? process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID
+          : process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID,
+        androidClientId: IS_EXPO_GO
+          ? process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID
+          : process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID,
         selectAccount: true,
+        // In Expo Go, override the redirect URI to use the Expo Auth proxy
+        // (HTTPS) instead of the default exp:// URI that Google rejects.
+        ...(expoGoRedirectUri ? { redirectUri: expoGoRedirectUri } : {}),
       },
       { scheme: "burpeepacer" },
     );
@@ -169,16 +224,19 @@ export default function HomeScreen() {
     const userCredential = await signInWithCredential(auth, credential);
     const isNewUser =
       getAdditionalUserInfo(userCredential)?.isNewUser ?? false;
+    const firebaseIdToken = await userCredential.user.getIdToken();
 
     if (isNewUser) {
       await sendWelcomeEmail(
         userCredential.user.uid,
         userCredential.user.email,
+        firebaseIdToken,
       );
     }
     await claimPendingSubscription(
       userCredential.user.uid,
       userCredential.user.email,
+      firebaseIdToken,
     );
     setAuthError("");
   }, []);
@@ -268,13 +326,30 @@ export default function HomeScreen() {
     setIsAuthenticating(true);
     try {
       if (isLoginFlow) {
-        await signInWithEmailAndPassword(auth, email, password);
+        const credential = await signInWithEmailAndPassword(auth, email, password);
+        const firebaseIdToken = await credential.user.getIdToken();
+        await claimPendingSubscription(
+          credential.user.uid,
+          credential.user.email,
+          firebaseIdToken,
+        );
       } else {
         const credential = await createUserWithEmailAndPassword(auth, email, password);
         const displayName = [firstName.trim(), lastName.trim()].filter(Boolean).join(" ");
         if (displayName) {
           await updateProfile(credential.user, { displayName });
         }
+        const firebaseIdToken = await credential.user.getIdToken();
+        await sendWelcomeEmail(
+          credential.user.uid,
+          credential.user.email,
+          firebaseIdToken,
+        );
+        await claimPendingSubscription(
+          credential.user.uid,
+          credential.user.email,
+          firebaseIdToken,
+        );
       }
     } catch (err: any) {
       setAuthError(err.message);
@@ -306,9 +381,18 @@ export default function HomeScreen() {
     setAuthMessage("");
     let nativeGoogleModule: GoogleSignInModule | null = null;
 
+    // In Expo Go without a resolved proxy URL, Google OAuth will fail because
+    // exp:// redirect URIs are rejected by Google. Show a clear message instead.
+    if (IS_EXPO_GO && !expoGoRedirectUri) {
+      setAuthError(
+        "Google sign-in in Expo Go requires logging in to Expo CLI (`npx expo login`). Use email/password to sign in while testing.",
+      );
+      return;
+    }
+
     if (!isNativeGoogleSignIn && !googleRequest) {
       setAuthError(
-        "Google sign-in is not configured for mobile. Add EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID, and native client IDs for production builds.",
+        "Google sign-in is not configured. Add EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID to your .env file.",
       );
       return;
     }
@@ -375,16 +459,13 @@ export default function HomeScreen() {
           );
           return;
         }
-        const { isErrorWithCode, statusCodes } = nativeGoogleModule;
-        if (isErrorWithCode(err) && err.code === statusCodes.SIGN_IN_CANCELLED) return;
-        if (isErrorWithCode(err) && err.code === statusCodes.IN_PROGRESS) {
+        const errorMessage = err?.message ?? "";
+        if (errorMessage.includes("SIGN_IN_CANCELLED") || err?.code === -4) return;
+        if (errorMessage.includes("IN_PROGRESS") || err?.code === -3) {
           setAuthError("Google sign-in is already in progress.");
           return;
         }
-        if (
-          isErrorWithCode(err) &&
-          err.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE
-        ) {
+        if (errorMessage.includes("PLAY_SERVICES_NOT_AVAILABLE") || err?.code === -1) {
           setAuthError("Google Play Services is not available or needs an update.");
           return;
         }

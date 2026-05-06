@@ -61,12 +61,14 @@ export default function PricingPage() {
     setCheckoutLoading(true);
     setCheckoutError(null);
     try {
+      const idToken = await user.getIdToken();
       const res = await fetch("/api/stripe/checkout", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        // Pass user credentials if logged in; guests pay first and sign up after
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${idToken}`,
+        },
         body: JSON.stringify({
-          userId: user?.uid ?? null,
           userEmail: user?.email ?? null,
         }),
       });
@@ -88,10 +90,14 @@ export default function PricingPage() {
     setPortalLoading(true);
     setPortalError(null);
     try {
+      const idToken = await user?.getIdToken();
+      if (!idToken) throw new Error("You must be signed in to manage billing");
       const res = await fetch("/api/stripe/portal", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ customerId: stripeCustomerId }),
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${idToken}`,
+        },
       });
       const { url, error } = await res.json();
       if (!res.ok) throw new Error(error ?? "Unable to open billing portal");

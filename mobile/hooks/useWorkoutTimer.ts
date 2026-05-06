@@ -175,7 +175,7 @@ export function useWorkoutTimer({
     }, 1000);
 
     return () => clearInterval(timerId);
-  }, [activeMode.mode, intervalSeconds, isActive, secondsLeft, totalSeconds]);
+  }, [activeMode.goal, activeMode.mode, intervalSeconds, isActive, secondsLeft, totalSeconds]);
 
   const resetTimer = () => {
     setIsActive(false);

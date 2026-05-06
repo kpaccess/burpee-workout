@@ -6,9 +6,6 @@ import {
 } from "../../../shared/workoutTimer";
 import {
   playCountdownTick,
-  playGoBeep,
-  playRepBeep,
-  playFinishBeep,
   playFinishWhistle,
   playPrepareWarningBeep,
   playRepWarningBeep,
@@ -76,16 +73,9 @@ export function useWorkoutTimer({
       : null;
 
   // ── Prepare countdown ──────────────────────────────────────────────
+  // ── Prepare: tick the countdown down ──────────────────────────────
   useEffect(() => {
-    if (phase !== "prepare") return;
-
-    if (prepareSecondsLeft <= 0) {
-      // Prepare done → GO!
-      playWhistle();
-      setPhase("workout");
-      setIsActive(true);
-      return;
-    }
+    if (phase !== "prepare" || prepareSecondsLeft <= 0) return;
 
     const timerId = setInterval(() => {
       setPrepareSecondsLeft((prev) => {
@@ -102,6 +92,16 @@ export function useWorkoutTimer({
     }, 1000);
 
     return () => clearInterval(timerId);
+  }, [phase, prepareSecondsLeft]);
+
+  // ── Prepare: transition to workout once countdown hits 0 ───────────
+  useEffect(() => {
+    if (phase === "prepare" && prepareSecondsLeft <= 0) {
+      playWhistle();
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setPhase("workout");
+      setIsActive(true);
+    }
   }, [phase, prepareSecondsLeft]);
 
   // ── Workout countdown ──────────────────────────────────────────────
@@ -172,7 +172,7 @@ export function useWorkoutTimer({
     }, 1000);
 
     return () => clearInterval(timerId);
-  }, [activeMode.mode, intervalSeconds, isActive, secondsLeft, totalSeconds]);
+  }, [activeMode.goal, activeMode.mode, intervalSeconds, isActive, secondsLeft, totalSeconds]);
 
   const resetTimer = () => {
     setIsActive(false);

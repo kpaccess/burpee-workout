@@ -6,11 +6,15 @@ import { useAuth } from "@/context/AuthContext";
 import { isAdmin } from "@/lib/allowlist";
 import type { AdminStats, UserRow } from "@/app/api/admin/stats/route";
 import {
+  Alert,
   Box,
   Button,
   Card,
   Chip,
   CircularProgress,
+  Divider,
+  IconButton,
+  InputAdornment,
   Paper,
   Table,
   TableBody,
@@ -18,17 +22,37 @@ import {
   TableContainer,
   TableHead,
   TableRow,
+  TextField,
+  Tooltip,
   Typography,
 } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import PeopleAltIcon from "@mui/icons-material/PeopleAlt";
 import VisibilityIcon from "@mui/icons-material/Visibility";
+import PersonAddAltIcon from "@mui/icons-material/PersonAddAlt";
+import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
+import StarIcon from "@mui/icons-material/Star";
+
+interface AllowlistEntry {
+  email: string;
+  addedAt: string;
+  addedBy: string;
+}
 
 export default function AdminPage() {
   const { user, loading } = useAuth();
   const router = useRouter();
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Allowlist state
+  const [allowlist, setAllowlist] = useState<AllowlistEntry[]>([]);
+  const [allowlistLoading, setAllowlistLoading] = useState(true);
+  const [newEmail, setNewEmail] = useState("");
+  const [addLoading, setAddLoading] = useState(false);
+  const [addError, setAddError] = useState<string | null>(null);
+  const [addSuccess, setAddSuccess] = useState<string | null>(null);
+  const [removeLoadingEmail, setRemoveLoadingEmail] = useState<string | null>(null);
 
   useEffect(() => {
     if (loading) return;
@@ -53,19 +77,93 @@ export default function AdminPage() {
       }
     }
 
+    async function fetchAllowlist() {
+      try {
+        const token = await user!.getIdToken();
+        const res = await fetch("/api/admin/allowlist", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        setAllowlist(data.emails ?? []);
+      } catch {
+        // Non-fatal — allowlist section shows empty state
+      } finally {
+        setAllowlistLoading(false);
+      }
+    }
+
     fetchStats();
+    fetchAllowlist();
   }, [user, loading, router]);
+
+  const handleAddEmail = async () => {
+    const trimmed = newEmail.trim().toLowerCase();
+    if (!trimmed) return;
+    setAddError(null);
+    setAddSuccess(null);
+    setAddLoading(true);
+
+    try {
+      const token = await user!.getIdToken();
+      const res = await fetch("/api/admin/allowlist", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ email: trimmed }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setAddError(data.error ?? "Failed to add email");
+        return;
+      }
+      setAllowlist((prev) => [
+        { email: trimmed, addedAt: new Date().toISOString(), addedBy: user!.email ?? "admin" },
+        ...prev,
+      ]);
+      setNewEmail("");
+      setAddSuccess(
+        data.grantedExistingUser
+          ? `${trimmed} added and granted Pro access immediately.`
+          : `${trimmed} added. They'll get Pro access when they sign up.`
+      );
+    } catch {
+      setAddError("Network error — please try again.");
+    } finally {
+      setAddLoading(false);
+    }
+  };
+
+  const handleRemoveEmail = async (email: string) => {
+    setRemoveLoadingEmail(email);
+    try {
+      const token = await user!.getIdToken();
+      const res = await fetch("/api/admin/allowlist", {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ email }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        alert(data.error ?? "Failed to remove email");
+        return;
+      }
+      setAllowlist((prev) => prev.filter((e) => e.email !== email));
+    } catch {
+      alert("Network error — please try again.");
+    } finally {
+      setRemoveLoadingEmail(null);
+    }
+  };
 
   if (loading || (!stats && !error)) {
     return (
-      <Box
-        sx={{
-          display: "flex",
-          minHeight: "100vh",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
+      <Box sx={{ display: "flex", minHeight: "100vh", alignItems: "center", justifyContent: "center" }}>
         <CircularProgress color="primary" />
       </Box>
     );
@@ -124,6 +222,131 @@ export default function AdminPage() {
         />
       </Box>
 
+      {/* ── Allowlist Management ─────────────────────────────────────── */}
+      <Box sx={{ mb: 6 }}>
+        <Box display="flex" alignItems="center" gap={1} mb={1}>
+          <StarIcon sx={{ color: "warning.main", fontSize: 22 }} />
+          <Typography variant="h6" fontWeight={800}>
+            Free Pro Access (Allowlist)
+          </Typography>
+        </Box>
+        <Typography variant="body2" color="text.secondary" mb={3}>
+          Emails added here get free Pro access. If they already have an account, access is granted immediately.
+          Otherwise it activates when they sign up.
+        </Typography>
+
+        {/* Add email form */}
+        <Box
+          component="form"
+          onSubmit={(e) => { e.preventDefault(); handleAddEmail(); }}
+          sx={{ display: "flex", gap: 1.5, mb: 2, maxWidth: 500 }}
+        >
+          <TextField
+            size="small"
+            fullWidth
+            placeholder="friend@example.com"
+            value={newEmail}
+            onChange={(e) => {
+              setNewEmail(e.target.value);
+              setAddError(null);
+              setAddSuccess(null);
+            }}
+            disabled={addLoading}
+            slotProps={{
+              input: {
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <PersonAddAltIcon sx={{ fontSize: 18, color: "text.disabled" }} />
+                  </InputAdornment>
+                ),
+              },
+            }}
+            sx={{
+              "& .MuiOutlinedInput-root": {
+                bgcolor: "rgba(255,255,255,0.04)",
+                "& fieldset": { borderColor: "rgba(255,255,255,0.15)" },
+                "&:hover fieldset": { borderColor: "rgba(255,255,255,0.3)" },
+              },
+            }}
+          />
+          <Button
+            type="submit"
+            variant="contained"
+            color="warning"
+            disabled={addLoading || !newEmail.trim()}
+            sx={{ whiteSpace: "nowrap", fontWeight: 700, minWidth: 100 }}
+          >
+            {addLoading ? <CircularProgress size={18} color="inherit" /> : "Add Email"}
+          </Button>
+        </Box>
+
+        {addError && <Alert severity="error" sx={{ mb: 2, maxWidth: 500 }}>{addError}</Alert>}
+        {addSuccess && <Alert severity="success" sx={{ mb: 2, maxWidth: 500 }}>{addSuccess}</Alert>}
+
+        {/* Allowlist table */}
+        <TableContainer component={Paper} sx={{ bgcolor: "#141414", maxWidth: 700 }}>
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                <TableCell sx={headerCell}>Email</TableCell>
+                <TableCell sx={headerCell}>Added</TableCell>
+                <TableCell sx={headerCell}>Added By</TableCell>
+                <TableCell sx={headerCell} align="center">Remove</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {allowlistLoading ? (
+                <TableRow>
+                  <TableCell colSpan={4} align="center" sx={{ py: 3 }}>
+                    <CircularProgress size={20} />
+                  </TableCell>
+                </TableRow>
+              ) : allowlist.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={4}>
+                    <Typography variant="caption" color="text.disabled">
+                      No emails in the allowlist yet.
+                    </Typography>
+                  </TableCell>
+                </TableRow>
+              ) : (
+                allowlist.map((entry) => (
+                  <TableRow key={entry.email} hover>
+                    <TableCell>
+                      <Typography variant="body2" fontWeight={500}>{entry.email}</Typography>
+                    </TableCell>
+                    <TableCell sx={{ color: "text.secondary", fontSize: 12, whiteSpace: "nowrap" }}>
+                      {formatDate(entry.addedAt)}
+                    </TableCell>
+                    <TableCell sx={{ color: "text.secondary", fontSize: 12 }}>
+                      {entry.addedBy}
+                    </TableCell>
+                    <TableCell align="center">
+                      <Tooltip title="Remove from allowlist">
+                        <span>
+                          <IconButton
+                            size="small"
+                            color="error"
+                            disabled={removeLoadingEmail === entry.email}
+                            onClick={() => handleRemoveEmail(entry.email)}
+                          >
+                            {removeLoadingEmail === entry.email
+                              ? <CircularProgress size={16} color="inherit" />
+                              : <DeleteOutlineIcon fontSize="small" />}
+                          </IconButton>
+                        </span>
+                      </Tooltip>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      </Box>
+
+      <Divider sx={{ mb: 6, borderColor: "rgba(255,255,255,0.08)" }} />
+
       {/* Daily views */}
       <Typography variant="h6" fontWeight={800} mb={2}>
         Visits by Day
@@ -132,8 +355,8 @@ export default function AdminPage() {
         <Table size="small">
           <TableHead>
             <TableRow>
-              <TableCell sx={(theme) => ({ fontWeight: theme.typography.fontWeightBold, color: "text.secondary" })}>Date</TableCell>
-              <TableCell sx={(theme) => ({ fontWeight: theme.typography.fontWeightBold, color: "text.secondary" })} align="right">Views</TableCell>
+              <TableCell sx={headerCell}>Date</TableCell>
+              <TableCell sx={headerCell} align="right">Views</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -148,7 +371,9 @@ export default function AdminPage() {
             {Object.keys(stats!.dailyViews ?? {}).length === 0 && (
               <TableRow>
                 <TableCell colSpan={2}>
-                  <Typography variant="caption" color="text.disabled">No daily data yet — will accumulate from new visits.</Typography>
+                  <Typography variant="caption" color="text.disabled">
+                    No daily data yet — will accumulate from new visits.
+                  </Typography>
                 </TableCell>
               </TableRow>
             )}
@@ -164,19 +389,12 @@ export default function AdminPage() {
         <Table size="small">
           <TableHead>
             <TableRow>
-              <TableCell sx={(theme) => ({ fontWeight: theme.typography.fontWeightBold, color: "text.secondary" })}>#</TableCell>
-              <TableCell sx={(theme) => ({ fontWeight: theme.typography.fontWeightBold, color: "text.secondary" })}>First Name</TableCell>
-              <TableCell sx={(theme) => ({ fontWeight: theme.typography.fontWeightBold, color: "text.secondary" })}>Last Name</TableCell>
-              <TableCell sx={(theme) => ({ fontWeight: theme.typography.fontWeightBold, color: "text.secondary" })}>Email</TableCell>
-              <TableCell sx={(theme) => ({ fontWeight: theme.typography.fontWeightBold, color: "text.secondary" })}>Joined</TableCell>
-              <TableCell sx={(theme) => ({ fontWeight: theme.typography.fontWeightBold, color: "text.secondary" })}>Last Login</TableCell>
-              <TableCell sx={(theme) => ({ fontWeight: theme.typography.fontWeightBold, color: "text.secondary" })}>Tier</TableCell>
-              <TableCell sx={(theme) => ({ fontWeight: theme.typography.fontWeightBold, color: "text.secondary" })}>Level</TableCell>
-              <TableCell sx={(theme) => ({ fontWeight: theme.typography.fontWeightBold, color: "text.secondary" })}>Day</TableCell>
-              <TableCell sx={(theme) => ({ fontWeight: theme.typography.fontWeightBold, color: "text.secondary" })}>Workouts</TableCell>
-              <TableCell sx={(theme) => ({ fontWeight: theme.typography.fontWeightBold, color: "text.secondary" })}>Timer Verified</TableCell>
-              <TableCell sx={(theme) => ({ fontWeight: theme.typography.fontWeightBold, color: "text.secondary" })}>Onboarded</TableCell>
-              <TableCell sx={(theme) => ({ fontWeight: theme.typography.fontWeightBold, color: "text.secondary" })}>Pro</TableCell>
+              {[
+                "#", "First Name", "Last Name", "Email", "Joined", "Last Login",
+                "Tier", "Level", "Day", "Workouts", "Timer Verified", "Onboarded", "Pro",
+              ].map((h) => (
+                <TableCell key={h} sx={headerCell}>{h}</TableCell>
+              ))}
             </TableRow>
           </TableHead>
           <TableBody>
@@ -194,12 +412,7 @@ export default function AdminPage() {
                 </TableCell>
                 <TableCell>
                   {u.tier ? (
-                    <Chip
-                      label={u.tier}
-                      size="small"
-                      color={u.tier === "beginner" ? "success" : "info"}
-                      sx={{ fontSize: 11 }}
-                    />
+                    <Chip label={u.tier} size="small" color={u.tier === "beginner" ? "success" : "info"} sx={{ fontSize: 11 }} />
                   ) : (
                     <Typography variant="caption" color="text.disabled">—</Typography>
                   )}
@@ -246,6 +459,15 @@ export default function AdminPage() {
   );
 }
 
+// ── Shared styles ──────────────────────────────────────────────────────────────
+
+const headerCell = (theme: import("@mui/material").Theme) => ({
+  fontWeight: theme.typography.fontWeightBold,
+  color: "text.secondary",
+});
+
+// ── Helper components ──────────────────────────────────────────────────────────
+
 function StatCard({
   icon,
   label,
@@ -267,6 +489,8 @@ function StatCard({
     </Card>
   );
 }
+
+// ── Utility functions ──────────────────────────────────────────────────────────
 
 function formatDate(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString("en-US", {

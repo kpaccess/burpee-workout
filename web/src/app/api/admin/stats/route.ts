@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminDb, getAdminApp } from "@/lib/firebase-admin";
 import { isAdmin } from "@/lib/allowlist";
-import { getAuth } from "firebase-admin/auth";
+import { getAuth, UserRecord } from "firebase-admin/auth";
 
 export interface UserRow {
   serialNo: number;
@@ -48,17 +48,25 @@ export async function GET(req: NextRequest) {
     const db = getAdminDb();
     const auth = getAuth(getAdminApp());
 
-    const [statsSnap, authResult] = await Promise.all([
+    const [statsSnap] = await Promise.all([
       db.collection("analytics").doc("stats").get(),
-      auth.listUsers(1000),
     ]);
 
     const statsData = statsSnap.exists ? (statsSnap.data() ?? {}) : {};
     const pageViews: number = statsData.pageViews ?? 0;
     const dailyViews: Record<string, number> = statsData.dailyViews ?? {};
 
+    // Fetch all users with pagination
+    const allUsers: UserRecord[] = [];
+    let pageToken: string | undefined;
+    do {
+      const result = await auth.listUsers(1000, pageToken);
+      allUsers.push(...result.users);
+      pageToken = result.pageToken;
+    } while (pageToken);
+
     // Fetch all user Firestore docs in parallel
-    const authUsers = authResult.users;
+    const authUsers = allUsers;
     const firestoreDocs = await Promise.all(
       authUsers.map((u) => db.collection("users").doc(u.uid).get()),
     );

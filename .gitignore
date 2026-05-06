@@ -13,6 +13,7 @@ dist/
 # Misc
 .DS_Store
 .env
+.env.n8n
 .env.local
 .env.development.local
 .env.test.local
