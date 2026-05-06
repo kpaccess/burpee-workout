@@ -1,0 +1,160 @@
+{
+  "name": "BurpeePacers – Weekly Engagement Emails",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "weeks",
+              "triggerAtDay": [
+                1
+              ],
+              "triggerAtHour": 9,
+              "triggerAtMinute": 0
+            }
+          ]
+        }
+      },
+      "id": "d1f2a3b4-c5d6-7e8f-9a0b-c1d2e3f4a5b6",
+      "name": "Every Monday 9am",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        100,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const crypto = require('crypto');\n\n// Configure in n8n as an environment variable or variable. Do not hardcode\n// service-account JSON in exported workflows.\nconst rawServiceAccount =\n  process.env.FIREBASE_SERVICE_ACCOUNT_KEY ||\n  $vars.FIREBASE_SERVICE_ACCOUNT_KEY;\n\nif (!rawServiceAccount) {\n  throw new Error('Missing FIREBASE_SERVICE_ACCOUNT_KEY in n8n environment or variables');\n}\n\nlet SERVICE_ACCOUNT;\ntry {\n  SERVICE_ACCOUNT = JSON.parse(rawServiceAccount);\n} catch (e) {\n  throw new Error('FIREBASE_SERVICE_ACCOUNT_KEY is not valid JSON: ' + e.message);\n}\n\nif (!SERVICE_ACCOUNT.project_id || !SERVICE_ACCOUNT.client_email || !SERVICE_ACCOUNT.private_key) {\n  throw new Error('FIREBASE_SERVICE_ACCOUNT_KEY must include project_id, client_email, and private_key');\n}\n\n// -- Level display names -------------------------------------------------------\nconst LEVEL_NAMES = {\n  '1A': 'Level 1A - No Landmark Workout',\n  '1B': 'Level 1B - 20 Navy Seals in 20 min',\n  '1C': 'Level 1C - 40 Navy Seals in 20 min',\n  '1D': 'Level 1D - 60 Navy Seals in 20 min',\n  '2': 'Level 2 - 80 Navy Seals in 20 min',\n  '3': 'Level 3 - 100 Navy Seals in 20 min',\n  '4': 'Level 4 - 120 Navy Seals in 20 min',\n  'grad': 'Graduation - 150 Navy Seals in 20 min',\n  'B1': 'Beginner 1 - 20 burpees in 20 min',\n  'B2': 'Beginner 2 - 40 burpees in 20 min',\n  'B3': 'Beginner 3 - 55 burpees in 20 min',\n  'B4': 'Beginner 4 - 70 burpees in 20 min',\n  'B5': 'Beginner 5 - 90 burpees in 20 min',\n  'B6': 'Beginner 6 - 110 burpees in 20 min',\n};\n\nfunction buildJWT(sa) {\n  const now = Math.floor(Date.now() / 1000);\n  const header = Buffer.from(JSON.stringify({ alg: 'RS256', typ: 'JWT' })).toString('base64url');\n  const payload = Buffer.from(JSON.stringify({\n    iss: sa.client_email,\n    sub: sa.client_email,\n    aud: 'https://oauth2.googleapis.com/token',\n    iat: now,\n    exp: now + 3600,\n    scope: 'https://www.googleapis.com/auth/cloud-platform https://www.googleapis.com/auth/firebase',\n  })).toString('base64url');\n  const toSign = header + '.' + payload;\n  const sig = crypto.createSign('RSA-SHA256');\n  sig.write(toSign);\n  sig.end();\n  return toSign + '.' + sig.sign(sa.private_key, 'base64url');\n}\n\nSERVICE_ACCOUNT.private_key = SERVICE_ACCOUNT.private_key.replace(/\\\\n/g, '\\n');\n\nconst jwt = buildJWT(SERVICE_ACCOUNT);\nlet tokenRes;\ntry {\n  tokenRes = await this.helpers.httpRequest({\n    method: 'POST',\n    url: 'https://oauth2.googleapis.com/token',\n    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },\n    body: 'grant_type=' + encodeURIComponent('urn:ietf:params:oauth:grant-type:jwt-bearer') + '&assertion=' + encodeURIComponent(jwt),\n  });\n} catch (e) {\n  throw new Error('OAuth token exchange failed: ' + e.message + ' - Google response: ' + JSON.stringify(e.response?.data || e.cause));\n}\nif (!tokenRes.access_token) throw new Error('No access_token in response: ' + JSON.stringify(tokenRes));\nconst token = tokenRes.access_token;\nconst pid = SERVICE_ACCOUNT.project_id;\n\nlet firestoreDocs = [];\nlet pageToken = '';\ndo {\n  const url = 'https://firestore.googleapis.com/v1/projects/' + pid + '/databases/(default)/documents/users?pageSize=300' + (pageToken ? '&pageToken=' + pageToken : '');\n  const res = await this.helpers.httpRequest({ method: 'GET', url, headers: { Authorization: 'Bearer ' + token } });\n  firestoreDocs = firestoreDocs.concat(res.documents || []);\n  pageToken = res.nextPageToken || '';\n} while (pageToken);\n\nconst levelByUid = {};\nfor (const doc of firestoreDocs) {\n  const uid = doc.name.split('/').pop();\n  levelByUid[uid] = doc.fields?.currentLevelId?.stringValue || null;\n}\n\nconst uids = Object.keys(levelByUid);\nconst results = [];\n\nfor (let i = 0; i < uids.length; i += 100) {\n  const batch = uids.slice(i, i + 100);\n  const authRes = await this.helpers.httpRequest({\n    method: 'POST',\n    url: 'https://identitytoolkit.googleapis.com/v1/projects/' + pid + '/accounts:lookup',\n    headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },\n    body: JSON.stringify({ localId: batch }),\n  });\n\n  for (const u of (authRes.users || [])) {\n    if (!u.email) continue;\n    const currentLevelId = levelByUid[u.localId] || null;\n    results.push({\n      json: {\n        uid: u.localId,\n        email: u.email,\n        displayName: u.displayName || u.email.split('@')[0],\n        currentLevelId,\n        levelName: currentLevelId ? (LEVEL_NAMES[currentLevelId] || currentLevelId) : null,\n        hasStarted: !!currentLevelId,\n      },\n    });\n  }\n}\n\nreturn results;\n"
+      },
+      "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+      "name": "Fetch Users from Firebase",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        400,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "has-started-cond",
+              "leftValue": "={{ $json.currentLevelId }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
+      "name": "Has Started Workout?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        700,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.email }}",
+        "subject": "You're crushing it — keep going! 💪",
+        "emailType": "html",
+        "message": "<!DOCTYPE html>\n<html lang=\"en\">\n<head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"></head>\n<body style=\"margin:0;padding:0;background:#f3f4f6;font-family:'Helvetica Neue',Arial,sans-serif;\">\n  <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#f3f4f6;padding:32px 0;\">\n    <tr><td align=\"center\">\n      <table width=\"600\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);\">\n        <!-- Header -->\n        <tr><td style=\"background:linear-gradient(135deg,#1a1a2e 0%,#16213e 100%);padding:32px 40px;text-align:center;\">\n          <p style=\"margin:0;color:#f59e0b;font-size:13px;font-weight:700;letter-spacing:3px;text-transform:uppercase;\">BurpeePacers</p>\n          <h1 style=\"margin:12px 0 0;color:#ffffff;font-size:28px;font-weight:800;\">You're crushing it! 🔥</h1>\n        </td></tr>\n        <!-- Body -->\n        <tr><td style=\"padding:40px;\">\n          <p style=\"color:#374151;font-size:16px;line-height:1.7;margin:0 0 20px;\">\n            Hey <strong>{{ $json.displayName }}</strong>,\n          </p>\n          <p style=\"color:#374151;font-size:16px;line-height:1.7;margin:0 0 20px;\">\n            We just wanted to check in and say — you're doing something most people never will. Every rep counts, and every session you show up is a win.\n          </p>\n          <!-- Level Badge -->\n          <div style=\"background:#f0f4ff;border-left:5px solid #4f46e5;border-radius:8px;padding:20px 24px;margin:28px 0;\">\n            <p style=\"margin:0 0 4px;color:#6366f1;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:2px;\">Current Level</p>\n            <p style=\"margin:0;color:#1e1b4b;font-size:18px;font-weight:700;\">{{ $json.levelName }}</p>\n          </div>\n          <p style=\"color:#374151;font-size:16px;line-height:1.7;margin:0 0 32px;\">\n            Keep that momentum going. Consistency is the difference between those who finish the program and those who wonder what it would have felt like. You're on the right side of that line. 💪\n          </p>\n          <!-- CTA Button -->\n          <div style=\"text-align:center;margin:0 0 32px;\">\n            <a href=\"https://www.burpeepacers.com\" style=\"display:inline-block;background:linear-gradient(135deg,#4f46e5,#7c3aed);color:#ffffff;text-decoration:none;padding:16px 40px;border-radius:10px;font-size:16px;font-weight:700;letter-spacing:0.5px;\">\n              Continue Your Workout →\n            </a>\n          </div>\n          <hr style=\"border:none;border-top:1px solid #e5e7eb;margin:0 0 24px;\">\n          <p style=\"color:#9ca3af;font-size:14px;line-height:1.6;margin:0;\">\n            Keep pushing,<br><strong style=\"color:#374151;\">The BurpeePacers Team</strong><br>\n            <a href=\"https://www.burpeepacers.com\" style=\"color:#4f46e5;text-decoration:none;\">burpeepacers.com</a>\n          </p>\n        </td></tr>\n      </table>\n    </td></tr>\n  </table>\n</body>\n</html>",
+        "options": {
+          "senderName": "BurpeePacers"
+        }
+      },
+      "id": "c3d4e5f6-a7b8-9012-cdef-123456789012",
+      "name": "Email: Keep It Up",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1000,
+        150
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.email }}",
+        "subject": "Your BurpeePacer journey is waiting 🏃",
+        "emailType": "html",
+        "message": "<!DOCTYPE html>\n<html lang=\"en\">\n<head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"></head>\n<body style=\"margin:0;padding:0;background:#f3f4f6;font-family:'Helvetica Neue',Arial,sans-serif;\">\n  <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#f3f4f6;padding:32px 0;\">\n    <tr><td align=\"center\">\n      <table width=\"600\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);\">\n        <!-- Header -->\n        <tr><td style=\"background:linear-gradient(135deg,#064e3b 0%,#065f46 100%);padding:32px 40px;text-align:center;\">\n          <p style=\"margin:0;color:#6ee7b7;font-size:13px;font-weight:700;letter-spacing:3px;text-transform:uppercase;\">BurpeePacers</p>\n          <h1 style=\"margin:12px 0 0;color:#ffffff;font-size:28px;font-weight:800;\">Your journey starts now 🏃</h1>\n        </td></tr>\n        <!-- Body -->\n        <tr><td style=\"padding:40px;\">\n          <p style=\"color:#374151;font-size:16px;line-height:1.7;margin:0 0 20px;\">\n            Hey <strong>{{ $json.displayName }}</strong>,\n          </p>\n          <p style=\"color:#374151;font-size:16px;line-height:1.7;margin:0 0 20px;\">\n            You took the first step and signed up — that already puts you ahead of most people. Now it's time for step two.\n          </p>\n          <!-- Steps -->\n          <div style=\"background:#f0fdf4;border-radius:12px;padding:24px;margin:28px 0;\">\n            <p style=\"margin:0 0 16px;color:#166534;font-size:14px;font-weight:700;text-transform:uppercase;letter-spacing:2px;\">What to expect</p>\n            <p style=\"margin:0 0 12px;color:#374151;font-size:15px;line-height:1.6;\">✅ <strong>Start at Beginner Level 1</strong> — just 20 burpees in 20 minutes</p>\n            <p style=\"margin:0 0 12px;color:#374151;font-size:15px;line-height:1.6;\">📈 <strong>Progress week by week</strong> — each level builds on the last</p>\n            <p style=\"margin:0;color:#374151;font-size:15px;line-height:1.6;\">🎓 <strong>Graduate the program</strong> — 150 Navy Seals in 20 minutes</p>\n          </div>\n          <p style=\"color:#374151;font-size:16px;line-height:1.7;margin:0 0 32px;\">\n            No experience needed. No equipment. Just you, your commitment, and 20 minutes a day. Thousands of people started exactly where you are right now.\n          </p>\n          <!-- CTA Button -->\n          <div style=\"text-align:center;margin:0 0 32px;\">\n            <a href=\"https://www.burpeepacers.com\" style=\"display:inline-block;background:linear-gradient(135deg,#059669,#047857);color:#ffffff;text-decoration:none;padding:16px 40px;border-radius:10px;font-size:16px;font-weight:700;letter-spacing:0.5px;\">\n              Start Your First Workout →\n            </a>\n          </div>\n          <hr style=\"border:none;border-top:1px solid #e5e7eb;margin:0 0 24px;\">\n          <p style=\"color:#9ca3af;font-size:14px;line-height:1.6;margin:0;\">\n            See you out there,<br><strong style=\"color:#374151;\">The BurpeePacers Team</strong><br>\n            <a href=\"https://www.burpeepacers.com\" style=\"color:#059669;text-decoration:none;\">burpeepacers.com</a>\n          </p>\n        </td></tr>\n      </table>\n    </td></tr>\n  </table>\n</body>\n</html>",
+        "options": {
+          "senderName": "BurpeePacers"
+        }
+      },
+      "id": "d4e5f6a7-b8c9-0123-def0-234567890123",
+      "name": "Email: Get Started",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1000,
+        450
+      ]
+    }
+  ],
+  "connections": {
+    "Every Monday 9am": {
+      "main": [
+        [
+          {
+            "node": "Fetch Users from Firebase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Users from Firebase": {
+      "main": [
+        [
+          {
+            "node": "Has Started Workout?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Started Workout?": {
+      "main": [
+        [
+          {
+            "node": "Email: Keep It Up",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Email: Get Started",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": []
+}

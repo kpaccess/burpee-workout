@@ -16,7 +16,12 @@ export function getAdminApp(): App {
     const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
 
     if (serviceAccountJson) {
-      const serviceAccount = JSON.parse(serviceAccountJson);
+      let serviceAccount;
+      try {
+        serviceAccount = JSON.parse(serviceAccountJson);
+      } catch {
+        throw new Error("FIREBASE_SERVICE_ACCOUNT_KEY is not valid JSON. Check your environment variable.");
+      }
       adminApp = initializeApp({
         credential: cert(serviceAccount),
         projectId: serviceAccount.project_id,

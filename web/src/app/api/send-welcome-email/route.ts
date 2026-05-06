@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Resend } from "resend";
-import { getAdminDb } from "@/lib/firebase-admin";
-import { isAllowlisted } from "@/lib/allowlist";
+import { getAdminDb, getAdminApp } from "@/lib/firebase-admin";
+import { getAdminEmails } from "@/lib/allowlist";
+import { isAllowlistedServer } from "@/lib/allowlist-server";
+import { getAuth } from "firebase-admin/auth";
 import {
   allowlistWelcomeEmailHtml,
   signupWelcomeEmailHtml,
@@ -20,14 +22,39 @@ const FROM = process.env.EMAIL_FROM ?? "BurpeePacer <hello@burpeepacers.com>";
 export async function POST(req: NextRequest) {
   let email = "unknown";
   try {
-    const { uid, email: reqEmail, force } = await req.json();
-    email = reqEmail;
+    const authHeader = req.headers.get("authorization") ?? "";
+    const idToken = authHeader.replace("Bearer ", "").trim();
 
-    if (!uid || !email) {
+    if (!idToken) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    let decoded;
+    try {
+      decoded = await getAuth(getAdminApp()).verifyIdToken(idToken);
+    } catch {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    const { uid, force } = await req.json();
+    email = decoded.email?.trim().toLowerCase() ?? "unknown";
+
+    if (!uid || email === "unknown") {
       return NextResponse.json(
         { error: "Missing uid or email" },
         { status: 400 },
       );
+    }
+
+    if (decoded.uid !== uid) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    if (force) {
+      const adminEmails = getAdminEmails();
+      if (!decoded.email || !adminEmails.includes(decoded.email.toLowerCase())) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
     }
 
     const db = getAdminDb();
@@ -39,7 +66,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ sent: false, reason: "already_sent" });
     }
 
-    const allowlisted = isAllowlisted(email);
+    const allowlisted = await isAllowlistedServer(email);
     const subject = allowlisted
       ? "🎉 You're In — Welcome to BurpeePacer!"
       : "💪 Thank You for Signing Up to BurpeePacer!";

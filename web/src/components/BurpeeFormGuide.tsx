@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { Box, Typography, Stack } from "@mui/material";
+import { Box, Typography } from "@mui/material";
 
 interface BurpeeFormGuideProps {
   isActive: boolean;
@@ -143,7 +143,11 @@ export default function BurpeeFormGuide({
   const [currentStep, setCurrentStep] = useState(0);
 
   useEffect(() => {
-    if (!isActive || secondsToNextRep === null) return;
+    if (!isActive || secondsToNextRep === null) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setCurrentStep(0);
+      return;
+    }
 
     const interval = setInterval(() => {
       setCurrentStep((prev) => (prev + 1) % BURPEE_STEPS.length);
@@ -151,12 +155,6 @@ export default function BurpeeFormGuide({
 
     return () => clearInterval(interval);
   }, [isActive, secondsToNextRep]);
-
-  useEffect(() => {
-    if (!isActive) {
-      setCurrentStep(0);
-    }
-  }, [isActive]);
 
   const step = BURPEE_STEPS[currentStep];
 

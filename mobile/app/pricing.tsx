@@ -90,11 +90,14 @@ export default function PricingScreen() {
 
     setLoadingCheckout(true);
     try {
+      const idToken = await user.getIdToken();
       const resp = await fetch(`${webUrl}/api/stripe/checkout`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${idToken}`,
+        },
         body: JSON.stringify({
-          userId: user.uid,
           userEmail: user.email,
           successUrl: "burpeepacer://payment-success",
           cancelUrl: "burpeepacer://pricing",
@@ -109,7 +112,7 @@ export default function PricingScreen() {
       const { url } = await resp.json();
       if (!url) throw new Error("No checkout URL returned");
 
-      const result = await openAuthSessionAsync(url, "burpeepacer://");
+      await openAuthSessionAsync(url, "burpeepacer://");
     } catch (err: any) {
       Alert.alert("Checkout error", err.message ?? "Something went wrong.");
     } finally {
@@ -221,7 +224,6 @@ export default function PricingScreen() {
 
 const CYAN = "#00E5FF";
 const GOLD = "#f59e0b";
-const RED = "#ef4444";
 
 const styles = StyleSheet.create({
   safeArea: {

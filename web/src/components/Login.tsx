@@ -31,11 +31,11 @@ import { useRouter } from "next/navigation";
 // and automatically link the pending advanced subscription to their new Firebase user.
 // This calls a server-side API route so the client never writes subscription fields
 // directly to Firestore (those fields are protected by security rules).
-async function claimPendingSubscription(uid: string, email: string) {
+async function claimPendingSubscription(uid: string, email: string, idToken: string) {
   try {
     const res = await fetch("/api/claim-subscription", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${idToken}` },
       body: JSON.stringify({ uid, email }),
     });
     if (!res.ok) {
@@ -46,11 +46,11 @@ async function claimPendingSubscription(uid: string, email: string) {
   }
 }
 
-async function sendWelcomeEmail(uid: string, email: string) {
+async function sendWelcomeEmail(uid: string, email: string, idToken: string) {
   try {
     const res = await fetch("/api/send-welcome-email", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${idToken}` },
       body: JSON.stringify({ uid, email }),
     });
     if (!res.ok) {
@@ -118,7 +118,8 @@ export default function Login({ onBackToInfo }: LoginProps) {
         if (displayName) {
           await updateProfile(credential.user, { displayName });
         }
-        const emailSent = await sendWelcomeEmail(credential.user.uid, email);
+        const idToken = await credential.user.getIdToken();
+        const emailSent = await sendWelcomeEmail(credential.user.uid, email, idToken);
         if (!emailSent) {
           console.warn("Welcome email failed to send during signup");
           setMessage(
@@ -129,13 +130,14 @@ export default function Login({ onBackToInfo }: LoginProps) {
 
       // If the user paid via Stripe before creating an account, link the
       // pending advanced subscription to their new Firebase account now.
-      await claimPendingSubscription(credential.user.uid, email);
+      const idToken = await credential.user.getIdToken();
+      await claimPendingSubscription(credential.user.uid, email, idToken);
 
       const nextPath =
         typeof window !== "undefined"
           ? new URLSearchParams(window.location.search).get("next")
           : null;
-      const destination = nextPath && nextPath.startsWith("/") ? nextPath : "/";
+      const destination = nextPath && /^\/(?!\/)/.test(nextPath) ? nextPath : "/";
       router.push(destination);
       // Keep loading state active — the page will navigate away
     } catch (err) {
@@ -193,19 +195,20 @@ export default function Login({ onBackToInfo }: LoginProps) {
       const provider = new GoogleAuthProvider();
       const credential = await signInWithPopup(auth, provider);
       const isNewUser = getAdditionalUserInfo(credential)?.isNewUser ?? false;
+      const idToken = await credential.user.getIdToken();
 
       if (isNewUser) {
-        await sendWelcomeEmail(credential.user.uid, credential.user.email!);
+        await sendWelcomeEmail(credential.user.uid, credential.user.email!, idToken);
       }
 
       // Always attempt claim — safe no-op if no pending subscription exists.
-      await claimPendingSubscription(credential.user.uid, credential.user.email!);
+      await claimPendingSubscription(credential.user.uid, credential.user.email!, idToken);
 
       const nextPath =
         typeof window !== "undefined"
           ? new URLSearchParams(window.location.search).get("next")
           : null;
-      router.push(nextPath?.startsWith("/") ? nextPath : "/");
+      router.push(nextPath && /^\/(?!\/)/.test(nextPath) ? nextPath : "/");
       // Keep loading state active — page navigates away.
     } catch (err) {
       const code = (err as { code?: string }).code ?? "";

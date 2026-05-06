@@ -20,6 +20,7 @@ import {
   Alert,
 } from "@mui/material";
 import PhotoCamera from "@mui/icons-material/PhotoCamera";
+import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import {
   ADVANCED_LEVELS,
   BEGINNER_LEVELS,
@@ -130,16 +131,44 @@ export default function Dashboard({
     setOpenLevelChange(false);
   };
 
-  const handleDay1PictureChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const [photoError, setPhotoError] = useState<string | null>(null);
+
+  const handleDay1PictureChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !onUpdateData) return;
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      onUpdateData({ startPictureUrl: reader.result as string });
-    };
-    reader.readAsDataURL(file);
+
+    if (file.size > 5 * 1024 * 1024) {
+      setPhotoError("File is too large. Maximum size is 5 MB.");
+      e.target.value = "";
+      return;
+    }
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+      setPhotoError("Invalid file type. Please upload a JPEG, PNG, or WebP image.");
+      e.target.value = "";
+      return;
+    }
+    setPhotoError(null);
+
     // Reset input so selecting the same file again still triggers onChange.
     e.target.value = "";
+
+    try {
+      const storage = getStorage();
+      const extensionByType: Record<string, string> = {
+        "image/jpeg": "jpg",
+        "image/png": "png",
+        "image/webp": "webp",
+      };
+      const ext = extensionByType[file.type];
+      const path = `users/${user!.uid}/photos/day1_${Date.now()}.${ext}`;
+      const storageRef = ref(storage, path);
+      await uploadBytes(storageRef, file);
+      const downloadUrl = await getDownloadURL(storageRef);
+      onUpdateData({ startPictureUrl: downloadUrl });
+    } catch (err) {
+      console.error("Failed to upload photo:", err);
+      setPhotoError("Failed to upload photo. Please try again.");
+    }
   };
 
   const getWorkoutLogForDate = (dateStr: string): WorkoutLog | null => {
@@ -674,8 +703,13 @@ export default function Dashboard({
                 </Typography>
               )}
               <Box sx={{ mt: 2 }}>
+                {photoError && (
+                  <Alert severity="error" sx={{ mb: 1 }}>
+                    {photoError}
+                  </Alert>
+                )}
                 <input
-                  accept="image/*"
+                  accept="image/jpeg,image/png,image/webp"
                   style={{ display: "none" }}
                   id="update-day1-picture"
                   type="file"
