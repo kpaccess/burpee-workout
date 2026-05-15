@@ -26,9 +26,9 @@ export default function LandingPage() {
   }, []);
   const weeklySchedule = [
     { day: "Mon", train: true },
-    { day: "Tue", train: true },
-    { day: "Wed", train: false },
-    { day: "Thu", train: true },
+    { day: "Tue", train: false },
+    { day: "Wed", train: true },
+    { day: "Thu", train: false },
     { day: "Fri", train: true },
     { day: "Sat", train: false },
     { day: "Sun", train: false },
