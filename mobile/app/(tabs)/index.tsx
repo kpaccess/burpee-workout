@@ -873,8 +873,8 @@ export default function HomeScreen() {
             <View style={styles.landingInfoCard}>
               <Text style={styles.landingInfoTitle}>Weekly Rhythm</Text>
               <Text style={styles.landingInfoText}>
-                A simple example schedule is Mon, Tue, Thu, Fri for training,
-                with recovery on the other days.
+                A simple example schedule is Mon, Wed, Fri for training,
+                with 48h rest between each session for full recovery.
               </Text>
               <Text style={styles.landingInfoText}>
                 Stay on schedule and the results compound.
@@ -1441,8 +1441,20 @@ export default function HomeScreen() {
             <View style={styles.statBox}>
               <Text style={styles.statLabel}>Start Weight</Text>
               <Text style={styles.statValue}>
-                {userData.startWeight}{" "}
-                <Text style={{ fontSize: 12 }}>kg/lbs</Text>
+                {userData.startWeight} lbs{" "}
+                <Text style={{ fontSize: 12 }}>({Math.round(userData.startWeight / 2.205)} kg)</Text>
+              </Text>
+            </View>
+          </View>
+          <View style={styles.statsRow}>
+            <View style={styles.statBox}>
+              <Text style={styles.statLabel}>Protein Target</Text>
+              <Text style={styles.statValue}>
+                ~{Math.round((userData.startWeight / 2.205) * 1.5)}g
+                <Text style={{ fontSize: 12 }}>/day</Text>
+              </Text>
+              <Text style={{ color: "#888", fontSize: 11, marginTop: 2 }}>
+                1.5g × kg body weight
               </Text>
             </View>
           </View>
@@ -1551,7 +1563,7 @@ export default function HomeScreen() {
                 const isCurrentMonth = isSameMonth(day, currentMonth);
                 const isToday = isSameDay(day, new Date());
                 const dayName = format(day, "EEE");
-                const isWorkoutDay = ["Mon", "Tue", "Thu", "Fri"].includes(
+                const isWorkoutDay = ["Mon", "Wed", "Fri"].includes(
                   dayName,
                 );
                 const dayLog = getWorkoutLogForDate(dateStr);
@@ -1617,7 +1629,7 @@ export default function HomeScreen() {
             </View>
           </View>
           <Text style={styles.calendarLegend}>
-            Scheduled days: Mon, Tue, Thu, Fri
+            Scheduled days: Mon, Wed, Fri • 48h rest between sessions
           </Text>
         </View>
 

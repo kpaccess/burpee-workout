@@ -365,7 +365,7 @@ export default function Dashboard({
                 Do the program on:
               </Typography>
               <Box display="flex" gap={1} flexWrap="wrap">
-                {["Mon", "Tue", "Thu", "Fri"].map((day) => (
+                {["Mon", "Wed", "Fri"].map((day) => (
                   <Chip
                     key={day}
                     label={day}
@@ -374,6 +374,9 @@ export default function Dashboard({
                   />
                 ))}
               </Box>
+              <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5 }}>
+                48h rest between each session for recovery &amp; adaptation
+              </Typography>
             </Card>
           </Grid>
 
@@ -435,7 +438,13 @@ export default function Dashboard({
                   Start Date: {startDate.toLocaleDateString()}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  Starting Weight: {userData.startWeight}
+                  Starting Weight: {userData.startWeight} lbs ({Math.round(userData.startWeight / 2.205)} kg)
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Protein target: ~{Math.round((userData.startWeight / 2.205) * 1.5)}g/day
+                  <Typography component="span" variant="caption" color="text.disabled" sx={{ ml: 0.5 }}>
+                    (1.5g × kg)
+                  </Typography>
                 </Typography>
                 {isBeginnerTrack && (
                   <Typography variant="body2" color="text.secondary" mt={1}>
@@ -545,7 +554,7 @@ export default function Dashboard({
             </Alert>
           )}
           <Typography variant="body2" color="text.secondary" mb={2}>
-            Check off your workout on scheduled days (Mon, Tue, Thu, Fri)
+            Check off your workout on scheduled days (Mon, Wed, Fri)
           </Typography>
 
           <Box
@@ -573,7 +582,7 @@ export default function Dashboard({
               const _dayName = format(dayObj, "EEE");
               const dayLog = getWorkoutLogForDate(dateStr);
               const isCompleted = !!dayLog?.completed;
-              const isWorkoutDay = ["Mon", "Tue", "Thu", "Fri"].includes(
+              const isWorkoutDay = ["Mon", "Wed", "Fri"].includes(
                 _dayName,
               );
               const isCurrentMonth = isSameMonth(dayObj, currentMonth);
