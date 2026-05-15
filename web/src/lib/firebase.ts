@@ -1,6 +1,6 @@
 import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
-import { getAuth, Auth } from 'firebase/auth';
-import { getFirestore, Firestore } from 'firebase/firestore';
+import { getAuth, Auth, connectAuthEmulator } from 'firebase/auth';
+import { getFirestore, Firestore, connectFirestoreEmulator } from 'firebase/firestore';
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -27,9 +27,17 @@ let db: Firestore | null = null;
 // Guard against missing env vars during Next.js SSR/build prerendering
 if (missingFirebaseEnvVars.length === 0) {
   try {
-    app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
+    const isNewApp = getApps().length === 0;
+    app = isNewApp ? initializeApp(firebaseConfig) : getApp();
     auth = getAuth(app);
     db = getFirestore(app);
+
+    // Connect to local emulators when running QA tests.
+    // Only on first init to avoid "already connected" errors from HMR.
+    if (isNewApp && process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATOR === 'true') {
+      connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true });
+      connectFirestoreEmulator(db, '127.0.0.1', 8080);
+    }
   } catch (e) {
     console.error('Firebase initialization error:', e);
   }
