@@ -20,6 +20,7 @@ import {
   Alert,
 } from "@mui/material";
 import PhotoCamera from "@mui/icons-material/PhotoCamera";
+import DownloadIcon from "@mui/icons-material/Download";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import {
   ADVANCED_LEVELS,
@@ -129,6 +130,31 @@ export default function Dashboard({
       onUpdateData({ currentLevelId: newLevel });
     }
     setOpenLevelChange(false);
+  };
+
+  const handleExportCSV = () => {
+    const logs = userData.workoutLogs ?? [];
+    const rows = [
+      ["Date", "Completed", "Level", "Mode", "Reps Completed", "Notes"],
+      ...logs.map((log) => [
+        log.date,
+        log.completed ? "Yes" : "No",
+        log.levelCompleted ?? "",
+        log.workoutType ?? "",
+        log.repsCompleted != null ? String(log.repsCompleted) : "",
+        log.notes ?? "",
+      ]),
+    ];
+    const csv = rows
+      .map((row) => row.map((cell) => `"${cell.replace(/"/g, '""')}"`).join(","))
+      .join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `burpee-workout-data-${format(new Date(), "yyyy-MM-dd")}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   const [photoError, setPhotoError] = useState<string | null>(null);
@@ -828,6 +854,42 @@ export default function Dashboard({
             ))}
           </Grid>
         </>
+
+        {/* Export Workout Data */}
+        {isAdvancedTrack && (
+          <Card sx={{ p: 3, mt: 4, mb: 2 }}>
+            <Typography variant="h6" fontWeight={700} gutterBottom>
+              Export Workout Data
+            </Typography>
+            <Typography variant="body2" color="text.secondary" mb={2}>
+              Download your full workout history as a CSV file.
+            </Typography>
+            {isPro ? (
+              <Button
+                variant="contained"
+                color="primary"
+                startIcon={<DownloadIcon />}
+                onClick={handleExportCSV}
+                disabled={(userData.workoutLogs ?? []).length === 0}
+              >
+                Export CSV
+              </Button>
+            ) : (
+              <Box>
+                <Typography variant="body2" color="text.secondary" mb={1}>
+                  CSV export is a Pro feature.
+                </Typography>
+                <Button
+                  variant="outlined"
+                  color="primary"
+                  onClick={() => router.push("/pricing")}
+                >
+                  Upgrade to Pro
+                </Button>
+              </Box>
+            )}
+          </Card>
+        )}
 
         {/* Update Level Dialog */}
         <Dialog
